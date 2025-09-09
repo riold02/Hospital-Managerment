@@ -1,0 +1,385 @@
+// Prisma schema for PostgreSQL
+// Authorization handled at application level (staff.role)
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model patients {
+  patient_id      Int       @id @default(autoincrement())
+  user_id         String?   @unique @db.Uuid  // Link to users table
+  first_name      String
+  last_name       String
+  date_of_birth   DateTime
+  gender          String?   @db.Char(1)
+  contact_number  String?   @db.VarChar(15)
+  address         String?   @db.VarChar(255)
+  email           String?   @db.VarChar(100)
+  medical_history String?
+  created_at      DateTime? @default(now()) @db.Timestamptz
+
+  // Relationships
+  user            users?    @relation(fields: [user_id], references: [user_id], onDelete: SetNull)
+  ambulance_log   ambulance_log[]
+  appointments    appointments[]
+  medical_records medical_records[]
+  billing         billing[]
+  pharmacy        pharmacy[]
+  prescriptions   prescriptions[]
+  room_assignments room_assignments[]
+
+  @@map("patients")
+}
+
+model ambulance {
+  ambulance_id     Int       @id @default(autoincrement())
+  ambulance_number String?   @db.VarChar(10)
+  availability     String?   @db.VarChar(15)
+  driver_id        Int?
+  last_service_date DateTime?
+
+  ambulance_log    ambulance_log[]
+
+  @@unique([ambulance_number])
+  @@map("ambulance")
+}
+
+model ambulance_log {
+  log_id          Int       @id @default(autoincrement())
+  ambulance_id    Int?
+  patient_id      Int?
+  pickup_location String?   @db.VarChar(100)
+  dropoff_location String?  @db.VarChar(100)
+  pickup_time     DateTime? @db.Timestamptz
+  dropoff_time    DateTime? @db.Timestamptz
+  status          String?   @db.VarChar(15)
+
+  ambulance       ambulance? @relation(fields: [ambulance_id], references: [ambulance_id], onDelete: Cascade)
+  patient         patients?  @relation(fields: [patient_id], references: [patient_id], onDelete: Cascade)
+
+  @@map("ambulance_log")
+}
+
+model departments {
+  department_id   Int                @id @default(autoincrement())
+  department_name String?            @db.VarChar(50)
+  location        String?            @db.VarChar(100)
+
+  staff           staff[]
+  doctor_department doctor_department[]
+
+  @@map("departments")
+}
+
+model doctors {
+  doctor_id        Int                @id @default(autoincrement())
+  first_name       String             @db.VarChar(50)
+  last_name        String             @db.VarChar(50)
+  specialty        String             @db.VarChar(100)
+  contact_number   String?            @db.VarChar(15)
+  email            String?            @db.VarChar(100)
+  available_schedule String?
+  created_at       DateTime?          @default(now()) @db.Timestamptz
+
+  doctor_department doctor_department[]
+  appointments      appointments[]
+  medical_records   medical_records[]
+  prescriptions     prescriptions[]
+
+  @@map("doctors")
+}
+
+model doctor_department {
+  doctor_id     Int
+  department_id Int
+
+  doctors      doctors    @relation(fields: [doctor_id], references: [doctor_id], onDelete: Cascade)
+  departments  departments @relation(fields: [department_id], references: [department_id], onDelete: Cascade)
+
+  @@id([doctor_id, department_id])
+  @@map("doctor_department")
+}
+
+model staff {
+  staff_id       Int        @id @default(autoincrement())
+  user_id        String?    @unique @db.Uuid  // Link to users table
+  first_name     String?
+  last_name      String?
+  role           String
+  position       String?    @db.VarChar(100)
+  department_id  Int?
+  contact_number String?    @db.VarChar(15)
+  email          String?    @db.VarChar(100)
+  address        String?
+  hire_date      DateTime?
+  created_at     DateTime?  @default(now()) @db.Timestamptz
+
+  // Relationships
+  user             users?       @relation(fields: [user_id], references: [user_id], onDelete: SetNull)
+  departments      departments? @relation(fields: [department_id], references: [department_id], onDelete: SetNull)
+  room_assignments room_assignments[]
+  cleaning_service cleaning_service[]
+
+  @@map("staff")
+}
+
+model room_types {
+  room_type_id   Int      @id @default(autoincrement())
+  room_type_name String
+  description    String?
+  rooms          rooms[]
+
+  @@map("room_types")
+}
+
+model rooms {
+  room_id        Int       @id @default(autoincrement())
+  room_number    String    @db.VarChar(10)
+  room_type_id   Int?
+  capacity       Int?
+  status         String?   @db.VarChar(20)
+  last_serviced  DateTime?
+
+  room_type        room_types? @relation(fields: [room_type_id], references: [room_type_id], onDelete: SetNull)
+  room_assignments room_assignments[]
+  cleaning_service cleaning_service[]
+
+  @@unique([room_number])
+  @@map("rooms")
+}
+
+model medicine {
+  medicine_id    Int       @id @default(autoincrement())
+  name           String     @db.VarChar(100)
+  brand          String?    @db.VarChar(50)
+  type           String?    @db.VarChar(20)
+  dosage         String?    @db.VarChar(50)
+  stock_quantity Int?
+  expiry_date    DateTime?
+  created_at     DateTime?  @default(now()) @db.Timestamptz
+
+  pharmacy       pharmacy[]
+
+  @@map("medicine")
+}
+
+model appointments {
+  appointment_id   Int       @id @default(autoincrement())
+  patient_id       Int
+  doctor_id        Int?
+  appointment_date DateTime
+  appointment_time DateTime  @db.Time
+  purpose          String?   @db.VarChar(255)
+  status           String?   @db.VarChar(20) @default("Scheduled")
+  created_at       DateTime? @default(now()) @db.Timestamptz
+
+  patient          patients  @relation(fields: [patient_id], references: [patient_id], onDelete: Cascade)
+  doctor           doctors?  @relation(fields: [doctor_id], references: [doctor_id], onDelete: SetNull)
+  medical_records  medical_records[]
+  billing          billing[]
+
+  @@map("appointments")
+}
+
+model medical_records {
+  record_id       Int       @id @default(autoincrement())
+  patient_id      Int
+  doctor_id       Int?
+  appointment_id  Int?
+  diagnosis       String?
+  treatment       String?
+  prescription    String?
+  created_at      DateTime? @default(now()) @db.Timestamptz
+
+  patient         patients     @relation(fields: [patient_id], references: [patient_id], onDelete: Cascade)
+  doctor          doctors?     @relation(fields: [doctor_id], references: [doctor_id], onDelete: SetNull)
+  appointment     appointments? @relation(fields: [appointment_id], references: [appointment_id], onDelete: NoAction)
+
+  @@map("medical_records")
+}
+
+model billing {
+  bill_id            Int       @id @default(autoincrement())
+  patient_id         Int
+  appointment_id     Int?
+  total_amount       Decimal   @db.Decimal(10,2)
+  payment_status     String?   @db.VarChar(20) @default("Pending")
+  payment_date       DateTime?
+  insurance_provider String?   @db.VarChar(100)
+  created_at         DateTime? @default(now()) @db.Timestamptz
+
+  patient            patients     @relation(fields: [patient_id], references: [patient_id], onDelete: Cascade)
+  appointment        appointments? @relation(fields: [appointment_id], references: [appointment_id], onDelete: NoAction)
+
+  @@map("billing")
+}
+
+model pharmacy {
+  pharmacy_id       Int       @id @default(autoincrement())
+  medicine_id       Int?
+  patient_id        Int?
+  quantity          Int?
+  prescription_date DateTime?
+
+  medicine          medicine? @relation(fields: [medicine_id], references: [medicine_id], onDelete: Cascade)
+  patient           patients? @relation(fields: [patient_id], references: [patient_id], onDelete: Cascade)
+
+  @@map("pharmacy")
+}
+
+model prescriptions {
+  prescription_id   Int       @id @default(autoincrement())
+  patient_id        Int
+  prescribed_by     Int       // doctor_id
+  prescription_date DateTime? @default(now())
+  medication        String?   @db.VarChar(100)
+  dosage            String?   @db.VarChar(100)
+  frequency         String?   @db.VarChar(50)
+  duration          String?   @db.VarChar(50)
+  instructions      String?   @db.VarChar(255)
+  status            String?   @db.VarChar(20) @default("Active")
+  created_at        DateTime? @default(now()) @db.Timestamptz
+
+  patient           patients @relation(fields: [patient_id], references: [patient_id])
+  doctor            doctors  @relation(fields: [prescribed_by], references: [doctor_id])
+
+  @@map("prescriptions")
+}
+
+model room_assignments {
+  assignment_id   Int       @id @default(autoincrement())
+  room_id         Int?
+  assignment_type String?   @db.VarChar(20) // 'Patient' or 'Staff'  
+  staff_id        Int?
+  patient_id      Int?
+  start_date      DateTime  @default(now()) @db.Timestamptz
+  end_date        DateTime? @db.Timestamptz
+  created_at      DateTime? @default(now()) @db.Timestamptz
+
+  room            rooms?    @relation(fields: [room_id], references: [room_id], onDelete: Cascade)
+  staff           staff?    @relation(fields: [staff_id], references: [staff_id], onDelete: SetNull)
+  patient         patients? @relation(fields: [patient_id], references: [patient_id], onDelete: SetNull)
+
+  @@map("room_assignments")
+}
+
+model cleaning_service {
+  cleaning_id    Int       @id @default(autoincrement())
+  room_id        Int?
+  cleaning_date  DateTime? @default(now())
+  cleaning_type  String?   @db.VarChar(50)
+  cleaned_by     Int?      // staff_id
+  status         String?   @db.VarChar(20) @default("Completed")
+  notes          String?   @db.VarChar(255)
+  created_at     DateTime? @default(now()) @db.Timestamptz
+
+  room           rooms?    @relation(fields: [room_id], references: [room_id])
+  staff          staff?    @relation(fields: [cleaned_by], references: [staff_id])
+
+  @@map("cleaning_service")
+}
+
+// ============================================================================
+// RBAC SYSTEM - Role-Based Access Control
+// ============================================================================
+
+model users {
+  user_id       String    @id @default(uuid()) @db.Uuid
+  email         String    @unique @db.VarChar(100)
+  password_hash String?   @db.VarChar(255)
+  is_active     Boolean   @default(true)
+  last_login    DateTime? @db.Timestamptz
+  created_at    DateTime  @default(now()) @db.Timestamptz
+  updated_at    DateTime  @updatedAt @db.Timestamptz
+
+  // Relationships
+  user_roles            user_roles[]
+  patient               patients?
+  staff_member          staff?
+  password_reset_tokens password_reset_tokens[]
+
+  @@map("users")
+}
+
+model roles {
+  role_id     Int      @id @default(autoincrement())
+  role_name   String   @unique @db.VarChar(50)
+  description String?  @db.VarChar(255)
+  is_active   Boolean  @default(true)
+  created_at  DateTime @default(now()) @db.Timestamptz
+  updated_at  DateTime @updatedAt @db.Timestamptz
+
+  // Relationships
+  user_roles       user_roles[]
+  role_permissions role_permissions[]
+
+  @@map("roles")
+}
+
+model permissions {
+  permission_id   Int      @id @default(autoincrement())
+  permission_name String   @unique @db.VarChar(100)
+  resource        String   @db.VarChar(50)  // e.g., 'patients', 'appointments'
+  action          String   @db.VarChar(50)  // e.g., 'create', 'read', 'update', 'delete'
+  description     String?  @db.VarChar(255)
+  created_at      DateTime @default(now()) @db.Timestamptz
+
+  // Relationships
+  role_permissions role_permissions[]
+
+  @@unique([resource, action])
+  @@map("permissions")
+}
+
+model user_roles {
+  user_id    String   @db.Uuid
+  role_id    Int
+  assigned_at DateTime @default(now()) @db.Timestamptz
+  assigned_by String?  @db.Uuid
+
+  // Relationships
+  user       users    @relation(fields: [user_id], references: [user_id], onDelete: Cascade)
+  role       roles    @relation(fields: [role_id], references: [role_id], onDelete: Cascade)
+
+  @@id([user_id, role_id])
+  @@map("user_roles")
+}
+
+model role_permissions {
+  role_id       Int
+  permission_id Int
+  granted_at    DateTime @default(now()) @db.Timestamptz
+
+  // Relationships
+  role          roles       @relation(fields: [role_id], references: [role_id], onDelete: Cascade)
+  permission    permissions @relation(fields: [permission_id], references: [permission_id], onDelete: Cascade)
+
+  @@id([role_id, permission_id])
+  @@map("role_permissions")
+}
+
+// ============================================================================
+// PASSWORD RESET TOKENS - For forgot password functionality
+// ============================================================================
+
+model password_reset_tokens {
+  token_id    String    @id @default(uuid()) @db.Uuid
+  user_id     String    @db.Uuid
+  token_hash  String    @db.VarChar(255)  // Hashed reset token
+  expires_at  DateTime  @db.Timestamptz   // Token expiration time
+  used_at     DateTime? @db.Timestamptz   // When token was used (null = not used)
+  created_at  DateTime  @default(now()) @db.Timestamptz
+
+  // Relationships
+  user        users     @relation(fields: [user_id], references: [user_id], onDelete: Cascade)
+
+  @@index([token_hash])
+  @@index([user_id])
+  @@index([expires_at])
+  @@map("password_reset_tokens")
+}

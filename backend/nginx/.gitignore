@@ -1,0 +1,21 @@
+# SSL Certificates - DO NOT COMMIT
+ssl/*.crt
+ssl/*.key
+ssl/*.pem
+ssl/*.p12
+
+# Nginx logs
+logs/
+*.log
+
+# Backup files
+*.bak
+*.backup
+
+# Temporary files
+*.tmp
+*.temp
+
+# OS files
+.DS_Store
+Thumbs.db
