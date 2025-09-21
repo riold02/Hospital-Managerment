@@ -14,6 +14,10 @@ const authenticateToken = async (req, res, next) => {
     const authHeader = req.headers['authorization'];
     const token = authHeader && authHeader.split(' ')[1]; // Bearer TOKEN
 
+    console.log('Auth header:', authHeader);
+    console.log('Extracted token:', token);
+    console.log('Token length:', token?.length);
+
     if (!token) {
       return res.status(401).json({
         success: false,
@@ -36,7 +40,10 @@ const authenticateToken = async (req, res, next) => {
             role: {
               include: {
                 role_permissions: {
-                  include: {
+                  select: {
+                    role_id: true,
+                    permission_id: true,
+                    created_at: true,
                     permission: true
                   }
                 }

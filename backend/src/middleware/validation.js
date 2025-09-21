@@ -7,6 +7,10 @@ const createSecureValidator = (field, options = {}) => {
   
   // Apply common security sanitization
   validator = validator.customSanitizer((value) => {
+    if (value === null || value === undefined) {
+      return value;
+    }
+    
     if (typeof value === 'string') {
       // Remove XSS attempts
       value = xss(value, {
@@ -149,8 +153,8 @@ const validatePatient = [
   
   body('gender')
     .optional()
-    .isIn(['M', 'F', 'O'])
-    .withMessage('Gender must be M (Male), F (Female), or O (Other)'),
+    .isIn(['male', 'female', 'other'])
+    .withMessage('Gender must be male, female, or other'),
   
   body('address')
     .optional()
@@ -214,8 +218,8 @@ const validatePatientUpdate = [
   
   body('gender')
     .optional()
-    .isIn(['M', 'F', 'O'])
-    .withMessage('Gender must be M (Male), F (Female), or O (Other)'),
+    .isIn(['male', 'female', 'other'])
+    .withMessage('Gender must be male, female, or other'),
   
   body('address')
     .optional()
@@ -477,8 +481,8 @@ const validateRegisterPatient = [
 
   body('gender')
     .optional()
-    .isIn(['M', 'F', 'O'])
-    .withMessage('Gender must be M (Male), F (Female), or O (Other)'),
+    .isIn(['male', 'female', 'other'])
+    .withMessage('Gender must be male, female, or other'),
 
   body('contact_number')
     .optional()
@@ -1520,7 +1524,7 @@ const validatePatientSecure = [
       return true;
     }
   }),
-  createSecureValidator('gender', { isIn: ['M', 'F', 'O'] }),
+  createSecureValidator('gender', { isIn: ['male', 'female', 'other'] }),
   createSecureValidator('address', { maxLength: 500 }),
   createSecureValidator('medical_history', { maxLength: 2000 }),
   handleValidationErrors
@@ -1557,7 +1561,7 @@ const validateRegisterPatientSecure = [
       return true;
     }
   }),
-  createSecureValidator('gender', { isIn: ['M', 'F', 'O'] }),
+  createSecureValidator('gender', { isIn: ['male', 'female', 'other'] }),
   createSecureValidator('contact_number', { 
     maxLength: 15, 
     matches: /^[\d\s\-\+\(\)]+$/, 
@@ -1587,6 +1591,111 @@ module.exports = {
   validatePatientSecure,
   validateLoginSecure,
   validateRegisterPatientSecure,
+  
+  // Legacy validators (maintained for compatibility)
+  validatePatient,
+  validatePatientUpdate,
+  validateDoctor,
+  validateDoctorUpdate,
+  validateDepartment,
+  validateDoctorDepartment,
+  validateAppointment,
+  validateAppointmentUpdate,
+  validateMedicalRecord,
+  validateMedicalRecordUpdate,
+  validateMedicalRecordMedicine,
+  validateBilling,
+  validateBillingUpdate,
+  validateStaff,
+  validateStaffUpdate,
+  validateMedicine,
+  validateMedicineUpdate,
+  validatePharmacy,
+  validateNurse,
+  validateWorker,
+  validateRoomType,
+  validateRoom,
+  validateRoomUpdate,
+  validateRoomAssignment,
+  validateRoomAssignmentUpdate,
+  validateCleaningService,
+  validateCleaningServiceUpdate,
+  validatePrescription,
+  validatePrescriptionUpdate,
+  validateAmbulance,
+  validateAmbulanceUpdate,
+  validateAmbulanceLog,
+  validateAmbulanceLogUpdate,
+  validateLogin,
+  validateRegisterPatient,
+  validateRegisterStaff,
+  validateChangePassword,
+  validateId,
+  validatePagination,
+  validateForgotPassword,
+  validateResetPassword
+};
+
+// Patient profile update validation (owner can update their own profile)
+const validatePatientProfileUpdate = [
+  body('first_name')
+    .optional()
+    .notEmpty()
+    .withMessage('First name cannot be empty')
+    .isLength({ max: 50 })
+    .withMessage('First name must not exceed 50 characters')
+    .trim(),
+  
+  body('last_name')
+    .optional()
+    .notEmpty()
+    .withMessage('Last name cannot be empty')
+    .isLength({ max: 50 })
+    .withMessage('Last name must not exceed 50 characters')
+    .trim(),
+  
+  body('phone')
+    .optional()
+    .isLength({ max: 15 })
+    .withMessage('Phone number must not exceed 15 characters')
+    .matches(/^[\d\s\-\+\(\)]+$/)
+    .withMessage('Phone number contains invalid characters'),
+  
+  body('date_of_birth')
+    .optional()
+    .isISO8601()
+    .withMessage('Valid date of birth is required (YYYY-MM-DD)')
+    .custom((value) => {
+      const birthDate = new Date(value);
+      const today = new Date();
+      const age = today.getFullYear() - birthDate.getFullYear();
+      
+      if (age < 0 || age > 150) {
+        throw new Error('Invalid date of birth');
+      }
+      
+      return true;
+    }),
+  
+  body('gender')
+    .optional()
+    .isIn(['male', 'female', 'other'])
+    .withMessage('Gender must be male, female, or other'),
+  
+  body('address')
+    .optional()
+    .isLength({ max: 500 })
+    .withMessage('Address must not exceed 500 characters')
+    .trim()
+];
+
+module.exports = {
+  createSecureValidator,
+  handleValidationErrors,
+  validatePatientSecure,
+  validateLoginSecure,
+  validateRegisterPatientSecure,
+  validatePatientProfileUpdate,
   
   // Legacy validators (maintained for compatibility)
   validatePatient,

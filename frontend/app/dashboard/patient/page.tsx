@@ -81,6 +81,21 @@ interface Bill {
   dueDate: string
 }
 
+interface PatientProfile {
+  patient_id: number
+  patient_code: string
+  first_name: string
+  last_name: string
+  email: string
+  phone: string | null
+  address: string | null
+  date_of_birth: string
+  gender: string
+  medical_history: string | null
+  created_at: string
+  updated_at: string
+}
+
 export default function PatientDashboard() {
   const [activeTab, setActiveTab] = useState("overview")
   const [appointments, setAppointments] = useState<Appointment[]>([])
@@ -91,6 +106,16 @@ export default function PatientDashboard() {
   const [isBookingOpen, setIsBookingOpen] = useState(false)
   const [selectedRecord, setSelectedRecord] = useState<MedicalRecord | null>(null)
   const [isRecordOpen, setIsRecordOpen] = useState(false)
+  const [patientProfile, setPatientProfile] = useState<PatientProfile | null>(null)
+  const [isEditingProfile, setIsEditingProfile] = useState(false)
+  const [profileForm, setProfileForm] = useState({
+    first_name: '',
+    last_name: '',
+    phone: '',
+    address: '',
+    date_of_birth: '',
+    gender: ''
+  })
   const { toast } = useToast()
   const { user, logout } = useAuth()
 
@@ -100,10 +125,20 @@ export default function PatientDashboard() {
       try {
         console.log("[v0] Loading patient dashboard data from API")
         console.log("[v0] Current user:", user)
+        console.log("[v0] Auth token:", localStorage.getItem('auth_token'))
+        console.log("[v0] User role:", localStorage.getItem('user_role'))
 
         // Check if user is authenticated
         if (!user) {
           console.error("[v0] No user found, redirecting to login")
+          // Don't show error for demo users, give auth context time to load
+          const token = localStorage.getItem('auth_token')
+          if (token && token.startsWith('demo_')) {
+            console.log("[v0] Demo token found, waiting for auth context...")
+            setLoading(false)
+            return
+          }
+          
           toast({
             title: "Lỗi xác thực",
             description: "Vui lòng đăng nhập lại.",
@@ -112,21 +147,59 @@ export default function PatientDashboard() {
           return
         }
 
-        // Fetch patient's appointments
-        const appointmentsData = await apiClient.getAppointments()
-        setAppointments(appointmentsData)
+        // Fetch patient's profile first (most important)
+        try {
+          const profileData = await apiClient.get("/auth/patient/profile")
+          if (profileData.success && profileData.data) {
+            setPatientProfile(profileData.data.patient)
+            // Initialize form with current data
+            const profile = profileData.data.patient
+            setProfileForm({
+              first_name: profile.first_name || '',
+              last_name: profile.last_name || '',
+              phone: profile.phone || '',
+              address: profile.address || '',
+              date_of_birth: profile.date_of_birth ? profile.date_of_birth.split('T')[0] : '',
+              gender: profile.gender || ''
+            })
+          }
+        } catch (error) {
+          console.error("[v0] Error fetching patient profile:", error)
+          toast({
+            title: "Lỗi",
+            description: "Không thể tải thông tin cá nhân",
+            variant: "destructive",
+          })
+        }
 
-        // Fetch patient's prescriptions
-        const prescriptionsData = await apiClient.get("/prescriptions?patient_id=current")
-        setPrescriptions(prescriptionsData)
+        // Fetch other data (optional - don't block if failed)
+        try {
+          const appointmentsData = await apiClient.getAppointments()
+          setAppointments(appointmentsData)
+        } catch (error) {
+          console.error("[v0] Error fetching appointments:", error)
+        }
 
-        // Fetch patient's medical history
-        const medicalData = await apiClient.getMedicalRecords()
-        setMedicalHistory(medicalData)
+        try {
+          const prescriptionsData = await apiClient.get("/prescriptions?patient_id=current")
+          setPrescriptions(prescriptionsData)
+        } catch (error) {
+          console.error("[v0] Error fetching prescriptions:", error)
+        }
 
-        // Fetch patient's billing information
-        const billingData = await apiClient.getBilling()
-        setBilling(billingData)
+        try {
+          const medicalData = await apiClient.getMedicalRecords()
+          setMedicalHistory(medicalData)
+        } catch (error) {
+          console.error("[v0] Error fetching medical records:", error)
+        }
+
+        try {
+          const billingData = await apiClient.getBilling()
+          setBilling(billingData)
+        } catch (error) {
+          console.error("[v0] Error fetching billing:", error)
+        }
       } catch (error) {
         console.error("[v0] Error fetching patient data:", error)
         if (error instanceof ApiError) {
@@ -241,6 +314,53 @@ export default function PatientDashboard() {
     }
   }
 
+  const handleEditProfile = () => {
+    setIsEditingProfile(true)
+  }
+
+  const handleCancelEdit = () => {
+    setIsEditingProfile(false)
+    // Reset form to original data
+    if (patientProfile) {
+      setProfileForm({
+        first_name: patientProfile.first_name || '',
+        last_name: patientProfile.last_name || '',
+        phone: patientProfile.phone || '',
+        address: patientProfile.address || '',
+        date_of_birth: patientProfile.date_of_birth ? patientProfile.date_of_birth.split('T')[0] : '',
+        gender: patientProfile.gender || ''
+      })
+    }
+  }
+
+  const handleSaveProfile = async () => {
+    try {
+      const response = await apiClient.put("/auth/patient/profile", profileForm)
+      if (response.success && response.data) {
+        setPatientProfile(response.data.patient)
+        setIsEditingProfile(false)
+        toast({
+          title: "Cập nhật thành công",
+          description: "Thông tin cá nhân đã được cập nhật.",
+        })
+      }
+    } catch (error) {
+      console.error("Error updating profile:", error)
+      toast({
+        title: "Lỗi",
+        description: "Không thể cập nhật thông tin. Vui lòng thử lại.",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const handleProfileFormChange = (field: string, value: string) => {
+    setProfileForm(prev => ({
+      ...prev,
+      [field]: value
+    }))
+  }
+
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat("vi-VN", {
       style: "currency",
@@ -280,8 +400,21 @@ export default function PatientDashboard() {
     )
   }
 
-  // Show login prompt if no user
-  if (!user) {
+  // Show login prompt if no user and not loading and not demo token
+  if (!user && !loading) {
+    const token = localStorage.getItem('auth_token')
+    // If there's a demo token, give auth context more time to load
+    if (token && token.startsWith('demo_')) {
+      return (
+        <div className="flex items-center justify-center min-h-screen">
+          <div className="text-center">
+            <RefreshCw className="h-8 w-8 animate-spin mx-auto mb-4" />
+            <p className="text-muted-foreground">Đang tải thông tin demo user...</p>
+          </div>
+        </div>
+      )
+    }
+    
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
@@ -313,7 +446,7 @@ export default function PatientDashboard() {
               <h2 className="text-lg font-semibold text-gray-900">Bệnh nhân</h2>
               <p className="text-sm text-gray-600">
                 {user?.profile?.first_name && user?.profile?.last_name 
-                  ? `${user.profile.last_name} ${user.profile.first_name}`
+                  ? `${user.profile.first_name} ${user.profile.last_name}`
                   : user?.email || 'Bệnh nhân'
                 }
               </p>
@@ -422,64 +555,157 @@ export default function PatientDashboard() {
               <CardHeader>
                 <div className="flex justify-between items-center">
                   <CardTitle>Thông tin cá nhân</CardTitle>
-                  <div className="bg-blue-50 text-blue-700 px-3 py-1 rounded-full text-sm font-medium">
-                    Chỉ xem thông tin cá nhân
-                  </div>
+                  {!isEditingProfile ? (
+                    <Button onClick={handleEditProfile} variant="outline">
+                      <Edit className="h-4 w-4 mr-2" />
+                      Chỉnh sửa
+                    </Button>
+                  ) : (
+                    <div className="flex gap-2">
+                      <Button onClick={handleSaveProfile} size="sm">
+                        Lưu
+                      </Button>
+                      <Button onClick={handleCancelEdit} variant="outline" size="sm">
+                        Hủy
+                      </Button>
+                    </div>
+                  )}
                 </div>
               </CardHeader>
               <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="space-y-4">
-                    <div>
-                      <Label className="font-semibold">Họ và tên:</Label>
-                      <p className="text-gray-700">
-                        {user?.profile?.first_name && user?.profile?.last_name 
-                          ? `${user.profile.last_name} ${user.profile.first_name}`
-                          : 'Chưa có thông tin'
-                        }
-                      </p>
+                {!isEditingProfile ? (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="space-y-4">
+                      <div>
+                        <Label className="font-semibold">Họ:</Label>
+                        <p className="text-gray-700">
+                          {patientProfile?.first_name || 'Chưa có thông tin'}
+                        </p>
+                      </div>
+                      <div>
+                        <Label className="font-semibold">Tên:</Label>
+                        <p className="text-gray-700">
+                          {patientProfile?.last_name || 'Chưa có thông tin'}
+                        </p>
+                      </div>
+                      <div>
+                        <Label className="font-semibold">Ngày sinh:</Label>
+                        <p className="text-gray-700">
+                          {patientProfile?.date_of_birth 
+                            ? new Date(patientProfile.date_of_birth).toLocaleDateString('vi-VN')
+                            : 'Chưa có thông tin'
+                          }
+                        </p>
+                      </div>
+                      <div>
+                        <Label className="font-semibold">Giới tính:</Label>
+                        <p className="text-gray-700">
+                          {patientProfile?.gender === 'male' && 'Nam'}
+                          {patientProfile?.gender === 'female' && 'Nữ'}
+                          {patientProfile?.gender === 'other' && 'Khác'}
+                          {!patientProfile?.gender && 'Chưa có thông tin'}
+                        </p>
+                      </div>
                     </div>
-                    <div>
-                      <Label className="font-semibold">Ngày sinh:</Label>
-                      <p className="text-gray-700">15/03/1985</p>
-                    </div>
-                    <div>
-                      <Label className="font-semibold">Giới tính:</Label>
-                      <p className="text-gray-700">Nam</p>
-                    </div>
-                    <div>
-                      <Label className="font-semibold">Số điện thoại:</Label>
-                      <p className="text-gray-700">0123456789</p>
+                    <div className="space-y-4">
+                      <div>
+                        <Label className="font-semibold">Email:</Label>
+                        <p className="text-gray-700">{patientProfile?.email || 'Chưa có thông tin'}</p>
+                      </div>
+                      <div>
+                        <Label className="font-semibold">Số điện thoại:</Label>
+                        <p className="text-gray-700">{patientProfile?.phone || 'Chưa có thông tin'}</p>
+                      </div>
+                      <div>
+                        <Label className="font-semibold">Địa chỉ:</Label>
+                        <p className="text-gray-700">{patientProfile?.address || 'Chưa có thông tin'}</p>
+                      </div>
+                      <div>
+                        <Label className="font-semibold">Mã bệnh nhân:</Label>
+                        <p className="text-gray-700">{patientProfile?.patient_code || 'Chưa có thông tin'}</p>
+                      </div>
                     </div>
                   </div>
-                  <div className="space-y-4">
-                    <div>
-                      <Label className="font-semibold">Email:</Label>
-                      <p className="text-gray-700">{user?.email || 'Chưa có thông tin'}</p>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="space-y-4">
+                      <div>
+                        <Label htmlFor="firstName">Họ</Label>
+                        <Input
+                          id="firstName"
+                          value={profileForm.first_name}
+                          onChange={(e) => handleProfileFormChange('first_name', e.target.value)}
+                          placeholder="Nhập họ"
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="lastName">Tên</Label>
+                        <Input
+                          id="lastName"
+                          value={profileForm.last_name}
+                          onChange={(e) => handleProfileFormChange('last_name', e.target.value)}
+                          placeholder="Nhập tên"
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="dateOfBirth">Ngày sinh</Label>
+                        <Input
+                          id="dateOfBirth"
+                          type="date"
+                          value={profileForm.date_of_birth}
+                          onChange={(e) => handleProfileFormChange('date_of_birth', e.target.value)}
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="gender">Giới tính</Label>
+                        <Select
+                          value={profileForm.gender}
+                          onValueChange={(value) => handleProfileFormChange('gender', value)}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Chọn giới tính" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="male">Nam</SelectItem>
+                            <SelectItem value="female">Nữ</SelectItem>
+                            <SelectItem value="other">Khác</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
                     </div>
-                    <div>
-                      <Label className="font-semibold">Họ tên:</Label>
-                      <p className="text-gray-700">
-                        {user?.profile?.first_name && user?.profile?.last_name 
-                          ? `${user.profile.last_name} ${user.profile.first_name}`
-                          : 'Chưa có thông tin'
-                        }
-                      </p>
-                    </div>
-                    <div>
-                      <Label className="font-semibold">Địa chỉ:</Label>
-                      <p className="text-gray-700">123 Đường ABC, Quận 1, TP.HCM</p>
-                    </div>
-                    <div>
-                      <Label className="font-semibold">Số BHYT:</Label>
-                      <p className="text-gray-700">DN1234567890123</p>
-                    </div>
-                    <div>
-                      <Label className="font-semibold">Trạng thái:</Label>
-                      <Badge className="bg-green-100 text-green-800">Đang điều trị</Badge>
+                    <div className="space-y-4">
+                      <div>
+                        <Label htmlFor="email">Email</Label>
+                        <Input
+                          id="email"
+                          value={patientProfile?.email || ''}
+                          disabled
+                          className="bg-gray-50"
+                        />
+                        <p className="text-sm text-gray-500 mt-1">Email không thể thay đổi</p>
+                      </div>
+                      <div>
+                        <Label htmlFor="phone">Số điện thoại</Label>
+                        <Input
+                          id="phone"
+                          value={profileForm.phone}
+                          onChange={(e) => handleProfileFormChange('phone', e.target.value)}
+                          placeholder="Nhập số điện thoại"
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="address">Địa chỉ</Label>
+                        <Textarea
+                          id="address"
+                          value={profileForm.address}
+                          onChange={(e) => handleProfileFormChange('address', e.target.value)}
+                          placeholder="Nhập địa chỉ"
+                          rows={3}
+                        />
+                      </div>
                     </div>
                   </div>
-                </div>
+                )}
               </CardContent>
             </Card>
           )}

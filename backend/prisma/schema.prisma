@@ -397,15 +397,16 @@ model user_roles {
 }
 
 model role_permissions {
-  role_id       Int
-  permission_id Int
-  granted_at    DateTime @default(now()) @db.Timestamptz
+  role_permission_id Int       @id @default(autoincrement())
+  role_id            Int
+  permission_id      Int
+  created_at         DateTime? @default(now()) @db.Timestamp
 
   // Relationships
   role          roles       @relation(fields: [role_id], references: [role_id], onDelete: Cascade)
   permission    permissions @relation(fields: [permission_id], references: [permission_id], onDelete: Cascade)
 
-  @@id([role_id, permission_id])
+  @@unique([role_id, permission_id])
   @@map("role_permissions")
 }
 

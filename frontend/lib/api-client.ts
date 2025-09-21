@@ -24,20 +24,22 @@ class ApiClient {
 
   setToken(token: string) {
     this.token = token
+    localStorage.setItem("auth_token", token)
   }
 
-  private async request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
+  private async request<T>(endpoint: string, options: RequestInit = {}, includeAuth: boolean = true): Promise<T> {
     const url = `${this.baseUrl}${endpoint}`
 
-    const headers: HeadersInit = {
+    const headers: { [key: string]: string } = {
       "Content-Type": "application/json",
-      ...options.headers,
     }
 
-    const storedToken = typeof window !== "undefined" ? localStorage.getItem("auth_token") : null
-    const effectiveToken = this.token || storedToken
-    if (effectiveToken) {
-      headers.Authorization = `Bearer ${effectiveToken}`
+    if (includeAuth) {
+      // Try to get token from instance or localStorage
+      const token = this.token || localStorage.getItem("auth_token")
+      if (token) {
+        headers.Authorization = `Bearer ${token}`
+      }
     }
 
     try {
@@ -248,12 +250,39 @@ class ApiClient {
     token: string
     user: any
   }> {
-    const response = await this.post<{ token: string; user: any }>("/auth/login", {
+    const response = await this.post<{ data: { token: string; user: any } }>("/auth/login", {
       email,
       password,
     })
-    this.setToken(response.token)
-    return response
+    this.setToken(response.data.token)
+    return response.data
+  }
+
+  async registerPatient(
+    first_name: string,
+    last_name: string,
+    email: string,
+    password: string,
+    date_of_birth: string,
+    gender: string,
+    contact_number: string,
+    address: string
+  ): Promise<{
+    token: string
+    user: any
+  }> {
+    const response = await this.post<{ data: { token: string; user: any } }>("/auth/register/patient", {
+      first_name,
+      last_name,
+      email,
+      password,
+      date_of_birth,
+      gender,
+      contact_number,
+      address,
+    })
+    this.setToken(response.data.token)
+    return response.data
   }
 
   async logout(): Promise<void> {

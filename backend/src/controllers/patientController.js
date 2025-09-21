@@ -133,7 +133,7 @@ class PatientController {
   }
 
   // Update patient
-  async updatePatient(req, res) {
+    async updatePatient(req, res) {
     try {
       // Check validation errors
       const errors = validationResult(req);

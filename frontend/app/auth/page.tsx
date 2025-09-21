@@ -26,6 +26,9 @@ export default function AuthPage() {
     firstName: "",
     lastName: "",
     dateOfBirth: "",
+    gender: "",
+    contactNumber: "",
+    address: "",
   })
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [isLoading, setIsLoading] = useState(false)
@@ -59,6 +62,15 @@ export default function AuthPage() {
       } else if (!/^\d{4}-\d{2}-\d{2}$/.test(formData.dateOfBirth)) {
         newErrors.dateOfBirth = "Ngày sinh phải theo định dạng YYYY-MM-DD"
       }
+      if (!formData.gender) {
+        newErrors.gender = "Giới tính là bắt buộc"
+      }
+      if (!formData.contactNumber) {
+        newErrors.contactNumber = "Số điện thoại là bắt buộc"
+      }
+      if (!formData.address) {
+        newErrors.address = "Địa chỉ là bắt buộc"
+      }
       if (formData.password !== formData.confirmPassword) {
         newErrors.confirmPassword = "Mật khẩu không khớp"
       }
@@ -76,8 +88,24 @@ export default function AuthPage() {
         if (isLogin) {
           try {
             const response = await apiClient.login(formData.email, formData.password)
+            console.log("Login API response:", response)
+            
+            // Clear any old demo data first
+            localStorage.removeItem("user_info")
+            localStorage.removeItem("user_role")
+            
             await login(response.token)
-            router.push("/dashboard")
+            
+            // Get user role from response to redirect appropriately
+            const userRole = response.user?.role?.toLowerCase() || 'patient'
+            
+            console.log("Redirecting user with role:", userRole)
+            
+            if (userRole === 'patient') {
+              router.push("/dashboard/patient")
+            } else {
+              router.push("/dashboard")
+            }
           } catch (apiError) {
             console.log("API authentication failed, trying demo accounts:", apiError)
 
@@ -86,12 +114,12 @@ export default function AuthPage() {
             )
 
             if (demoAccount) {
-              // Demo: lưu "token" giả để hợp với flow AuthProvider
+              // Demo: lưa "token" giả để hợp với flow AuthProvider
               await login("demo_token")
 
               const roleRoutes: Record<string, string> = {
                 Admin: "/dashboard/admin",
-                Doctor: "/dashboard/doctor",
+                Doctor: "/dashboard/doctor", 
                 Nurse: "/dashboard/nurse",
                 Patient: "/dashboard/patient",
                 Pharmacist: "/dashboard/pharmacist",
@@ -107,22 +135,24 @@ export default function AuthPage() {
             }
           }
         } else {
+          // Registration
           try {
-            const response = await apiClient.post("/auth/register/patient", {
-              email: formData.email,
-              password: formData.password,
-              first_name: formData.firstName,
-              last_name: formData.lastName,
-              date_of_birth: formData.dateOfBirth,
-            })
-
-            const loginResponse = await apiClient.login(formData.email, formData.password)
-            await login(loginResponse.token)
+            const response = await apiClient.registerPatient(
+              formData.firstName, // first_name
+              formData.lastName, // last_name
+              formData.email,
+              formData.password,
+              formData.dateOfBirth,
+              formData.gender,
+              formData.contactNumber,
+              formData.address
+            )
+            
+            await login(response.token)
             router.push("/dashboard/patient")
-          } catch (apiError) {
-            setErrors({
-              email: "Đăng ký thất bại. Vui lòng thử lại sau.",
-            })
+          } catch (error) {
+            console.error("Registration error:", error)
+            setErrors({ email: "Đăng ký thất bại, vui lòng thử lại." })
           }
         }
       } catch (error) {
@@ -137,16 +167,33 @@ export default function AuthPage() {
   const handleDemoLogin = async (account: (typeof demoAccounts)[0]) => {
     setIsLoading(true)
     try {
-      const demoToken = JSON.stringify({
+      // Create a proper demo token structure
+      const demoUserData = {
+        id: account.user_id,
         user_id: account.user_id,
-        role: account.role,
         email: account.email,
-        firstName: account.firstName,
-        lastName: account.lastName,
-        exp: Date.now() + 24 * 60 * 60 * 1000, // 24 hours
-      })
+        role: account.role.toLowerCase(),
+        roles: [account.role.toLowerCase()],
+        permissions: [],
+        type: account.role === 'Patient' ? 'patient' : 'staff',
+        patient_id: account.role === 'Patient' ? 1 : null,
+        staff_id: account.role !== 'Patient' ? 1 : null,
+        profile: {
+          first_name: account.firstName,
+          last_name: account.lastName,
+          position: account.role,
+          staff_role: account.role !== 'Patient' ? account.role : null
+        }
+      }
 
-      login(demoToken)
+      // Store demo token and user data
+      const demoToken = `demo_${account.user_id}_${Date.now()}`
+      localStorage.setItem("auth_token", demoToken)
+      localStorage.setItem("user_role", account.role.toLowerCase())
+      localStorage.setItem("user_info", JSON.stringify(demoUserData))
+      
+      // Set demo user directly without API call
+      await login(demoToken)
 
       const roleRoutes: Record<string, string> = {
         Admin: "/dashboard/admin",
@@ -261,6 +308,44 @@ export default function AuthPage() {
                       />
                     </div>
                     {errors.dateOfBirth && <p className="text-sm text-destructive">{errors.dateOfBirth}</p>}
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="gender">Giới tính</Label>
+                    <select
+                      id="gender"
+                      className={cn("w-full px-3 py-2 border border-input rounded-md bg-background text-sm", errors.gender && "border-destructive")}
+                      value={formData.gender}
+                      onChange={(e) => handleInputChange("gender", e.target.value)}
+                    >
+                      <option value="">Chọn giới tính</option>
+                      <option value="male">Nam</option>
+                      <option value="female">Nữ</option>
+                      <option value="other">Khác</option>
+                    </select>
+                    {errors.gender && <p className="text-sm text-destructive">{errors.gender}</p>}
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="contactNumber">Số điện thoại</Label>
+                    <Input
+                      id="contactNumber"
+                      type="tel"
+                      placeholder="0123456789"
+                      className={cn(errors.contactNumber && "border-destructive focus-visible:ring-destructive")}
+                      value={formData.contactNumber}
+                      onChange={(e) => handleInputChange("contactNumber", e.target.value)}
+                    />
+                    {errors.contactNumber && <p className="text-sm text-destructive">{errors.contactNumber}</p>}
+                  </div>
+                  <div className="space-y-2 col-span-2">
+                    <Label htmlFor="address">Địa chỉ</Label>
+                    <Input
+                      id="address"
+                      placeholder="Nhập địa chỉ của bạn"
+                      className={cn(errors.address && "border-destructive focus-visible:ring-destructive")}
+                      value={formData.address}
+                      onChange={(e) => handleInputChange("address", e.target.value)}
+                    />
+                    {errors.address && <p className="text-sm text-destructive">{errors.address}</p>}
                   </div>
                 </div>
               )}

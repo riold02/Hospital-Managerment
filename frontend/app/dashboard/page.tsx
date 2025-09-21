@@ -1,4 +1,6 @@
 "use client"
+import { useEffect } from "react"
+import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -28,7 +30,27 @@ import {
 
 export default function HospitalDashboard() {
   const { user } = useAuth()
+  const router = useRouter()
   const rbac = new RBACManager()
+
+  // Auto-redirect patients to their specific dashboard
+  useEffect(() => {
+    if (user) {
+      const userRole = user.role?.toLowerCase() || user.roles?.[0]?.toLowerCase()
+      
+      // Redirect patients to their specific dashboard
+      if (userRole === 'patient') {
+        router.push('/dashboard/patient')
+        return
+      }
+      
+      // Could add other role-specific redirects here
+      // if (userRole === 'doctor') {
+      //   router.push('/dashboard/doctor')
+      //   return
+      // }
+    }
+  }, [user, router])
 
   const stats = [
     {

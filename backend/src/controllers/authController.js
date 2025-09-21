@@ -81,6 +81,7 @@ class AuthController {
         const patient = await tx.patients.create({
           data: {
             patient_code: patientCode,
+            user_id: user.user_id, // Direct foreign key assignment
             first_name,
             last_name,
             email,
@@ -88,10 +89,7 @@ class AuthController {
             gender,
             phone: contact_number, // Map contact_number to phone column
             address,
-            medical_history: null,
-            user: {
-              connect: { user_id: user.user_id }
-            }
+            medical_history: null
           }
         });
 
@@ -308,6 +306,17 @@ class AuthController {
 
       console.log('Login attempt for:', email);
       console.log('User found:', !!user);
+      
+      if (user) {
+        console.log('User details:', {
+          user_id: user.user_id,
+          email: user.email,
+          password_hash_exists: !!user.password_hash,
+          password_hash_length: user.password_hash?.length,
+          patient: !!user.patient,
+          staff_member: !!user.staff_member
+        });
+      }
 
       if (!user) {
         return res.status(401).json({
@@ -317,7 +326,13 @@ class AuthController {
       }
 
       // Check password
+      console.log('Comparing password...');
+      console.log('Input password:', password);
+      console.log('Stored hash:', user.password_hash);
+      
       const isPasswordValid = await bcrypt.compare(password, user.password_hash);
+      console.log('Password valid:', isPasswordValid);
+      
       if (!isPasswordValid) {
         return res.status(401).json({
           success: false,
@@ -365,6 +380,10 @@ class AuthController {
         process.env.JWT_SECRET,
         { expiresIn: process.env.JWT_EXPIRES_IN }
       );
+
+      console.log('Generated token:', token);
+      console.log('Token length:', token.length);
+      console.log('Token type:', typeof token);
 
       res.json({
         success: true,
@@ -754,6 +773,124 @@ class AuthController {
       res.status(500).json({
         success: false,
         error: 'Đã xảy ra lỗi khi xác thực token'
+      });
+    }
+  }
+
+  // Update patient profile (only owner can update)
+  async updatePatientProfile(req, res) {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({
+          success: false,
+          error: 'Validation failed',
+          details: errors.array()
+        });
+      }
+
+      const userId = req.user.user_id;
+      const { first_name, last_name, phone, address, date_of_birth, gender } = req.body;
+
+      // Find the patient record for this user
+      const existingPatient = await prisma.patients.findFirst({
+        where: { user_id: userId }
+      });
+
+      if (!existingPatient) {
+        return res.status(404).json({
+          success: false,
+          error: 'Patient record not found'
+        });
+      }
+
+      // Prepare update data - only include fields that are provided
+      const updateData = {};
+      if (first_name !== undefined) updateData.first_name = first_name;
+      if (last_name !== undefined) updateData.last_name = last_name;
+      if (phone !== undefined) updateData.phone = phone;
+      if (address !== undefined) updateData.address = address;
+      if (date_of_birth !== undefined) updateData.date_of_birth = new Date(date_of_birth);
+      if (gender !== undefined) updateData.gender = gender;
+
+      // Update patient record
+      const updatedPatient = await prisma.patients.update({
+        where: { patient_id: existingPatient.patient_id },
+        data: updateData,
+        select: {
+          patient_id: true,
+          patient_code: true,
+          first_name: true,
+          last_name: true,
+          email: true,
+          phone: true,
+          address: true,
+          date_of_birth: true,
+          gender: true,
+          created_at: true,
+          updated_at: true
+        }
+      });
+
+      res.status(200).json({
+        success: true,
+        message: 'Profile updated successfully',
+        data: {
+          patient: updatedPatient
+        }
+      });
+
+    } catch (error) {
+      console.error('Update patient profile error:', error);
+      res.status(500).json({
+        success: false,
+        error: 'Đã xảy ra lỗi khi cập nhật thông tin'
+      });
+    }
+  }
+
+  // Get current patient profile
+  async getPatientProfile(req, res) {
+    try {
+      const userId = req.user.user_id;
+
+      const patient = await prisma.patients.findFirst({
+        where: { user_id: userId },
+        select: {
+          patient_id: true,
+          patient_code: true,
+          first_name: true,
+          last_name: true,
+          email: true,
+          phone: true,
+          address: true,
+          date_of_birth: true,
+          gender: true,
+          medical_history: true,
+          created_at: true,
+          updated_at: true
+        }
+      });
+
+      if (!patient) {
+        return res.status(404).json({
+          success: false,
+          error: 'Patient record not found'
+        });
+      }
+
+      res.status(200).json({
+        success: true,
+        data: {
+          patient: patient
+        }
+      });
+
+    } catch (error) {
+      console.error('Get patient profile error:', error);
+      res.status(500).json({
+        success: false,
+        error: 'Đã xảy ra lỗi khi lấy thông tin'
       });
     }
   }

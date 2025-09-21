@@ -8,6 +8,7 @@ const {
   validateChangePassword,
   validateLoginSecure,
   validateRegisterPatientSecure,
+  validatePatientProfileUpdate,
   validateForgotPassword,
   validateResetPassword
 } = require('../middleware/validation');
@@ -389,5 +390,123 @@ router.post('/reset-password', validateResetPassword, authController.resetPasswo
  *         description: Server error
  */
 router.get('/verify-reset-token/:token', authController.verifyResetToken);
+
+/**
+ * @swagger
+ * /api/v1/auth/patient/profile:
+ *   get:
+ *     summary: Get current patient profile
+ *     tags: [Patient Profile]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Patient profile retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     patient:
+ *                       type: object
+ *                       properties:
+ *                         patient_id:
+ *                           type: integer
+ *                         patient_code:
+ *                           type: string
+ *                         first_name:
+ *                           type: string
+ *                         last_name:
+ *                           type: string
+ *                         email:
+ *                           type: string
+ *                         phone:
+ *                           type: string
+ *                         address:
+ *                           type: string
+ *                         date_of_birth:
+ *                           type: string
+ *                           format: date
+ *                         gender:
+ *                           type: string
+ *                           enum: [male, female, other]
+ *                         medical_history:
+ *                           type: string
+ *                         created_at:
+ *                           type: string
+ *                           format: date-time
+ *                         updated_at:
+ *                           type: string
+ *                           format: date-time
+ *       401:
+ *         description: Unauthorized
+ *       404:
+ *         description: Patient not found
+ */
+router.get('/patient/profile', authenticateToken, authController.getPatientProfile);
+
+/**
+ * @swagger
+ * /api/v1/auth/patient/profile:
+ *   put:
+ *     summary: Update patient profile (only owner can update)
+ *     tags: [Patient Profile]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               first_name:
+ *                 type: string
+ *                 maxLength: 50
+ *               last_name:
+ *                 type: string
+ *                 maxLength: 50
+ *               phone:
+ *                 type: string
+ *                 maxLength: 15
+ *               address:
+ *                 type: string
+ *                 maxLength: 500
+ *               date_of_birth:
+ *                 type: string
+ *                 format: date
+ *               gender:
+ *                 type: string
+ *                 enum: [male, female, other]
+ *     responses:
+ *       200:
+ *         description: Profile updated successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 message:
+ *                   type: string
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     patient:
+ *                       type: object
+ *       400:
+ *         description: Validation error
+ *       401:
+ *         description: Unauthorized
+ *       404:
+ *         description: Patient not found
+ */
+router.put('/patient/profile', authenticateToken, validatePatientProfileUpdate, authController.updatePatientProfile);
 
 module.exports = router;

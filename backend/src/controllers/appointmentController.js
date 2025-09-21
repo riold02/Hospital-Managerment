@@ -9,7 +9,9 @@ class AppointmentController {
       if (!errors.isEmpty()) {
         return res.status(400).json({
           success: false,
-          error: 'Validation failed',
+                   first_name: true,
+              last_name: true,
+              phone: true,  error: 'Validation failed',
           details: errors.array()
         });
       }
@@ -19,8 +21,8 @@ class AppointmentController {
         doctor_id: req.body.doctor_id ? Number(req.body.doctor_id) : null,
         appointment_date: new Date(req.body.appointment_date),
         appointment_time: req.body.appointment_time,
-        purpose: req.body.purpose ?? null,
-        status: req.body.status || 'Scheduled'
+        reason: req.body.purpose || req.body.reason || null,
+        status: req.body.status || 'scheduled'
       };
 
       // Check if doctor is available at the requested time
@@ -99,7 +101,7 @@ class AppointmentController {
                 first_name: true,
                 last_name: true,
                 email: true,
-                contact_number: true
+                phone: true
               }
             },
             doctor: {
@@ -153,7 +155,7 @@ class AppointmentController {
               first_name: true,
               last_name: true,
               email: true,
-              contact_number: true,
+              phone: true,
               date_of_birth: true,
               gender: true,
               address: true,
@@ -167,7 +169,7 @@ class AppointmentController {
               last_name: true,
               specialty: true,
               email: true,
-              contact_number: true
+              phone: true
             }
           }
         }
@@ -211,7 +213,7 @@ class AppointmentController {
         doctor_id: req.body.doctor_id ? Number(req.body.doctor_id) : undefined,
         appointment_date: req.body.appointment_date ? new Date(req.body.appointment_date) : undefined,
         appointment_time: req.body.appointment_time,
-        purpose: req.body.purpose,
+        reason: req.body.purpose || req.body.reason,
         status: req.body.status
       };
 
@@ -265,7 +267,7 @@ class AppointmentController {
               first_name: true,
               last_name: true,
               email: true,
-              contact_number: true
+              phone: true
             }
           },
           doctor: {
@@ -365,7 +367,7 @@ class AppointmentController {
               patient_id: true,
               first_name: true,
               last_name: true,
-              contact_number: true
+              phone: true
             }
           }
         },
