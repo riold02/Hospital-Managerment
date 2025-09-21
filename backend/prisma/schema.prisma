@@ -11,17 +11,25 @@ datasource db {
 }
 
 model patients {
-  patient_id      Int       @id @default(autoincrement())
-  user_id         String?   @unique @db.Uuid  // Link to users table
-  first_name      String
-  last_name       String
-  date_of_birth   DateTime
-  gender          String?   @db.Char(1)
-  contact_number  String?   @db.VarChar(15)
-  address         String?   @db.VarChar(255)
-  email           String?   @db.VarChar(100)
-  medical_history String?
-  created_at      DateTime? @default(now()) @db.Timestamptz
+  patient_id              Int       @id @default(autoincrement())
+  patient_code            String    @unique @db.VarChar(20)
+  user_id                 String?   @unique @db.Uuid  // Link to users table
+  first_name              String    @db.VarChar(50)
+  last_name               String    @db.VarChar(50)
+  date_of_birth           DateTime? @db.Date
+  gender                  String?   @db.VarChar(10)
+  phone                   String?   @db.VarChar(20)
+  email                   String?   @db.VarChar(100)
+  address                 String?
+  emergency_contact_name  String?   @db.VarChar(100)
+  emergency_contact_phone String?   @db.VarChar(20)
+  blood_type              String?   @db.VarChar(5)
+  allergies               String?
+  medical_history         String?
+  insurance_number        String?   @db.VarChar(50)
+  is_active               Boolean?  @default(true)
+  created_at              DateTime? @default(now()) @db.Timestamptz
+  updated_at              DateTime? @default(now()) @db.Timestamptz
 
   // Relationships
   user            users?    @relation(fields: [user_id], references: [user_id], onDelete: SetNull)
@@ -41,8 +49,11 @@ model ambulance {
   ambulance_number String?   @db.VarChar(10)
   availability     String?   @db.VarChar(15)
   driver_id        Int?
+  driver_user_id   String?   @db.Uuid  // Link to users table
   last_service_date DateTime?
 
+  // Relationships
+  driver_user     users?    @relation(fields: [driver_user_id], references: [user_id], onDelete: SetNull)
   ambulance_log    ambulance_log[]
 
   @@unique([ambulance_number])
@@ -78,14 +89,17 @@ model departments {
 
 model doctors {
   doctor_id        Int                @id @default(autoincrement())
+  user_id          String?            @unique @db.Uuid  // Link to users table
   first_name       String             @db.VarChar(50)
   last_name        String             @db.VarChar(50)
   specialty        String             @db.VarChar(100)
-  contact_number   String?            @db.VarChar(15)
+  phone            String?            @db.VarChar(15)  // Changed from contact_number to phone
   email            String?            @db.VarChar(100)
   available_schedule String?
   created_at       DateTime?          @default(now()) @db.Timestamptz
 
+  // Relationships
+  user             users?             @relation(fields: [user_id], references: [user_id], onDelete: SetNull)
   doctor_department doctor_department[]
   appointments      appointments[]
   medical_records   medical_records[]
@@ -113,7 +127,7 @@ model staff {
   role           String
   position       String?    @db.VarChar(100)
   department_id  Int?
-  contact_number String?    @db.VarChar(15)
+  phone          String?    @db.VarChar(15)  // Changed from contact_number to phone
   email          String?    @db.VarChar(100)
   address        String?
   hire_date      DateTime?
@@ -191,14 +205,17 @@ model medical_records {
   patient_id      Int
   doctor_id       Int?
   appointment_id  Int?
+  created_by_user_id String? @db.Uuid  // Who created/updated the record
   diagnosis       String?
   treatment       String?
   prescription    String?
   created_at      DateTime? @default(now()) @db.Timestamptz
 
+  // Relationships
   patient         patients     @relation(fields: [patient_id], references: [patient_id], onDelete: Cascade)
   doctor          doctors?     @relation(fields: [doctor_id], references: [doctor_id], onDelete: SetNull)
   appointment     appointments? @relation(fields: [appointment_id], references: [appointment_id], onDelete: NoAction)
+  created_by_user users?       @relation(fields: [created_by_user_id], references: [user_id], onDelete: SetNull)
 
   @@map("medical_records")
 }
@@ -207,14 +224,17 @@ model billing {
   bill_id            Int       @id @default(autoincrement())
   patient_id         Int
   appointment_id     Int?
+  processed_by_user_id String? @db.Uuid  // Who processed the billing
   total_amount       Decimal   @db.Decimal(10,2)
   payment_status     String?   @db.VarChar(20) @default("Pending")
   payment_date       DateTime?
   insurance_provider String?   @db.VarChar(100)
   created_at         DateTime? @default(now()) @db.Timestamptz
 
+  // Relationships
   patient            patients     @relation(fields: [patient_id], references: [patient_id], onDelete: Cascade)
   appointment        appointments? @relation(fields: [appointment_id], references: [appointment_id], onDelete: NoAction)
+  processed_by_user  users?       @relation(fields: [processed_by_user_id], references: [user_id], onDelete: SetNull)
 
   @@map("billing")
 }
@@ -223,11 +243,14 @@ model pharmacy {
   pharmacy_id       Int       @id @default(autoincrement())
   medicine_id       Int?
   patient_id        Int?
+  dispensed_by_user_id String? @db.Uuid  // Who dispensed the medicine
   quantity          Int?
   prescription_date DateTime?
 
+  // Relationships
   medicine          medicine? @relation(fields: [medicine_id], references: [medicine_id], onDelete: Cascade)
   patient           patients? @relation(fields: [patient_id], references: [patient_id], onDelete: Cascade)
+  dispensed_by_user users?    @relation(fields: [dispensed_by_user_id], references: [user_id], onDelete: SetNull)
 
   @@map("pharmacy")
 }
@@ -236,6 +259,7 @@ model prescriptions {
   prescription_id   Int       @id @default(autoincrement())
   patient_id        Int
   prescribed_by     Int       // doctor_id
+  prescribed_by_user_id String? @db.Uuid  // User who prescribed (should match doctor's user_id)
   prescription_date DateTime? @default(now())
   medication        String?   @db.VarChar(100)
   dosage            String?   @db.VarChar(100)
@@ -245,8 +269,10 @@ model prescriptions {
   status            String?   @db.VarChar(20) @default("Active")
   created_at        DateTime? @default(now()) @db.Timestamptz
 
+  // Relationships
   patient           patients @relation(fields: [patient_id], references: [patient_id])
   doctor            doctors  @relation(fields: [prescribed_by], references: [doctor_id])
+  prescribed_by_user users?  @relation(fields: [prescribed_by_user_id], references: [user_id], onDelete: SetNull)
 
   @@map("prescriptions")
 }
@@ -257,13 +283,16 @@ model room_assignments {
   assignment_type String?   @db.VarChar(20) // 'Patient' or 'Staff'  
   staff_id        Int?
   patient_id      Int?
+  assigned_by_user_id String? @db.Uuid  // Who made the assignment
   start_date      DateTime  @default(now()) @db.Timestamptz
   end_date        DateTime? @db.Timestamptz
   created_at      DateTime? @default(now()) @db.Timestamptz
 
+  // Relationships
   room            rooms?    @relation(fields: [room_id], references: [room_id], onDelete: Cascade)
   staff           staff?    @relation(fields: [staff_id], references: [staff_id], onDelete: SetNull)
   patient         patients? @relation(fields: [patient_id], references: [patient_id], onDelete: SetNull)
+  assigned_by_user users?   @relation(fields: [assigned_by_user_id], references: [user_id], onDelete: SetNull)
 
   @@map("room_assignments")
 }
@@ -274,12 +303,15 @@ model cleaning_service {
   cleaning_date  DateTime? @default(now())
   cleaning_type  String?   @db.VarChar(50)
   cleaned_by     Int?      // staff_id
+  cleaned_by_user_id String? @db.Uuid  // User who performed cleaning
   status         String?   @db.VarChar(20) @default("Completed")
   notes          String?   @db.VarChar(255)
   created_at     DateTime? @default(now()) @db.Timestamptz
 
+  // Relationships
   room           rooms?    @relation(fields: [room_id], references: [room_id])
   staff          staff?    @relation(fields: [cleaned_by], references: [staff_id])
+  cleaned_by_user users?   @relation(fields: [cleaned_by_user_id], references: [user_id], onDelete: SetNull)
 
   @@map("cleaning_service")
 }
@@ -299,9 +331,20 @@ model users {
 
   // Relationships
   user_roles            user_roles[]
+  user_roles_assigned   user_roles[] @relation("UserRolesAssignedBy")
   patient               patients?
   staff_member          staff?
+  doctor                doctors?
   password_reset_tokens password_reset_tokens[]
+  
+  // Business activity relationships
+  ambulance_driver      ambulance[]
+  medical_records_created medical_records[]
+  prescriptions_written prescriptions[]
+  billing_processed     billing[]
+  pharmacy_dispensed    pharmacy[]
+  room_assignments_made room_assignments[]
+  cleaning_services_performed cleaning_service[]
 
   @@map("users")
 }
@@ -337,16 +380,19 @@ model permissions {
 }
 
 model user_roles {
-  user_id    String   @db.Uuid
-  role_id    Int
-  assigned_at DateTime @default(now()) @db.Timestamptz
-  assigned_by String?  @db.Uuid
+  user_role_id Int      @id @default(autoincrement())
+  user_id      String   @db.Uuid
+  role_id      Int
+  assigned_at  DateTime @default(now()) @db.Timestamptz
+  assigned_by  String?  @db.Uuid
+  is_active    Boolean? @default(true)
 
   // Relationships
   user       users    @relation(fields: [user_id], references: [user_id], onDelete: Cascade)
   role       roles    @relation(fields: [role_id], references: [role_id], onDelete: Cascade)
+  assigned_by_user users? @relation("UserRolesAssignedBy", fields: [assigned_by], references: [user_id])
 
-  @@id([user_id, role_id])
+  @@unique([user_id, role_id])
   @@map("user_roles")
 }
 

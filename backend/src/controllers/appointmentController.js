@@ -41,7 +41,7 @@ class AppointmentController {
       const data = await prisma.appointments.create({
         data: appointmentData,
         include: {
-          patient: { select: { patient_id: true, first_name: true, last_name: true, email: true, contact_number: true } },
+          patient: { select: { patient_id: true, first_name: true, last_name: true, email: true, phone: true } },
           doctor: { select: { doctor_id: true, first_name: true, last_name: true, specialty: true } }
         }
       });

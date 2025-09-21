@@ -1,0 +1,604 @@
+{
+  "database": {
+    "name": "hospital_db",
+    "type": "postgresql",
+    "version": "15",
+    "description": "Hospital Management System Database",
+    "created": "2025-09-20"
+  },
+  "tables": [
+    {
+      "name": "users",
+      "description": "Core authentication and user management",
+      "category": "Authentication",
+      "columns": [
+        {"name": "user_id", "type": "UUID", "primary": true, "nullable": false},
+        {"name": "email", "type": "VARCHAR(100)", "unique": true, "nullable": false},
+        {"name": "password_hash", "type": "VARCHAR(255)", "nullable": true},
+        {"name": "is_active", "type": "BOOLEAN", "default": true},
+        {"name": "is_verified", "type": "BOOLEAN", "default": false},
+        {"name": "last_login", "type": "TIMESTAMPTZ", "nullable": true},
+        {"name": "created_at", "type": "TIMESTAMPTZ", "default": "CURRENT_TIMESTAMP"},
+        {"name": "updated_at", "type": "TIMESTAMPTZ", "default": "CURRENT_TIMESTAMP"}
+      ],
+      "relationships": [
+        {"type": "one-to-many", "target": "user_roles", "via": "user_id"},
+        {"type": "one-to-one", "target": "patients", "via": "user_id"},
+        {"type": "one-to-one", "target": "staff", "via": "user_id"}
+      ]
+    },
+    {
+      "name": "roles",
+      "description": "Role-based access control roles",
+      "category": "Authentication",
+      "columns": [
+        {"name": "role_id", "type": "SERIAL", "primary": true},
+        {"name": "role_name", "type": "VARCHAR(50)", "unique": true, "nullable": false},
+        {"name": "role_description", "type": "TEXT", "nullable": true},
+        {"name": "is_active", "type": "BOOLEAN", "default": true},
+        {"name": "created_at", "type": "TIMESTAMPTZ", "default": "CURRENT_TIMESTAMP"}
+      ],
+      "relationships": [
+        {"type": "one-to-many", "target": "user_roles", "via": "role_id"},
+        {"type": "one-to-many", "target": "role_permissions", "via": "role_id"}
+      ]
+    },
+    {
+      "name": "user_roles",
+      "description": "Junction table for users and roles",
+      "category": "Authentication",
+      "columns": [
+        {"name": "user_role_id", "type": "SERIAL", "primary": true},
+        {"name": "user_id", "type": "UUID", "nullable": false, "foreign_key": "users.user_id"},
+        {"name": "role_id", "type": "INTEGER", "nullable": false, "foreign_key": "roles.role_id"},
+        {"name": "assigned_at", "type": "TIMESTAMPTZ", "default": "CURRENT_TIMESTAMP"},
+        {"name": "assigned_by", "type": "UUID", "nullable": true, "foreign_key": "users.user_id"},
+        {"name": "is_active", "type": "BOOLEAN", "default": true}
+      ],
+      "constraints": [
+        {"type": "unique", "columns": ["user_id", "role_id"]}
+      ]
+    },
+    {
+      "name": "permissions",
+      "description": "System permissions for RBAC",
+      "category": "Authentication",
+      "columns": [
+        {"name": "permission_id", "type": "SERIAL", "primary": true},
+        {"name": "permission_name", "type": "VARCHAR(100)", "unique": true, "nullable": false},
+        {"name": "permission_description", "type": "TEXT", "nullable": true},
+        {"name": "resource", "type": "VARCHAR(50)", "nullable": true},
+        {"name": "action", "type": "VARCHAR(50)", "nullable": true},
+        {"name": "is_active", "type": "BOOLEAN", "default": true},
+        {"name": "created_at", "type": "TIMESTAMPTZ", "default": "CURRENT_TIMESTAMP"}
+      ]
+    },
+    {
+      "name": "role_permissions",
+      "description": "Junction table for roles and permissions",
+      "category": "Authentication",
+      "columns": [
+        {"name": "role_id", "type": "INTEGER", "primary": true, "foreign_key": "roles.role_id"},
+        {"name": "permission_id", "type": "INTEGER", "primary": true, "foreign_key": "permissions.permission_id"},
+        {"name": "granted_at", "type": "TIMESTAMPTZ", "default": "CURRENT_TIMESTAMP"},
+        {"name": "granted_by", "type": "UUID", "nullable": true, "foreign_key": "users.user_id"}
+      ]
+    },
+    {
+      "name": "password_reset_tokens",
+      "description": "Secure password reset functionality",
+      "category": "Authentication", 
+      "columns": [
+        {"name": "token_id", "type": "SERIAL", "primary": true},
+        {"name": "user_id", "type": "UUID", "nullable": false, "foreign_key": "users.user_id"},
+        {"name": "token_hash", "type": "VARCHAR(255)", "nullable": false},
+        {"name": "expires_at", "type": "TIMESTAMPTZ", "nullable": false},
+        {"name": "used_at", "type": "TIMESTAMPTZ", "nullable": true},
+        {"name": "created_at", "type": "TIMESTAMPTZ", "default": "CURRENT_TIMESTAMP"}
+      ]
+    },
+    {
+      "name": "departments",
+      "description": "Hospital departments and divisions",
+      "category": "Organization",
+      "columns": [
+        {"name": "department_id", "type": "SERIAL", "primary": true},
+        {"name": "department_name", "type": "VARCHAR(100)", "nullable": false},
+        {"name": "department_head_id", "type": "INTEGER", "nullable": true},
+        {"name": "location", "type": "VARCHAR(200)", "nullable": true},
+        {"name": "phone", "type": "VARCHAR(20)", "nullable": true},
+        {"name": "email", "type": "VARCHAR(100)", "nullable": true},
+        {"name": "budget", "type": "DECIMAL(15,2)", "nullable": true},
+        {"name": "is_active", "type": "BOOLEAN", "default": true},
+        {"name": "created_at", "type": "TIMESTAMPTZ", "default": "CURRENT_TIMESTAMP"},
+        {"name": "updated_at", "type": "TIMESTAMPTZ", "default": "CURRENT_TIMESTAMP"}
+      ]
+    },
+    {
+      "name": "staff",
+      "description": "All hospital employees",
+      "category": "Personnel",
+      "columns": [
+        {"name": "staff_id", "type": "SERIAL", "primary": true},
+        {"name": "employee_id", "type": "VARCHAR(20)", "unique": true, "nullable": false},
+        {"name": "user_id", "type": "UUID", "unique": true, "nullable": true, "foreign_key": "users.user_id"},
+        {"name": "first_name", "type": "VARCHAR(50)", "nullable": false},
+        {"name": "last_name", "type": "VARCHAR(50)", "nullable": false},
+        {"name": "email", "type": "VARCHAR(100)", "unique": true, "nullable": true},
+        {"name": "phone", "type": "VARCHAR(20)", "nullable": true},
+        {"name": "role", "type": "VARCHAR(50)", "nullable": false, "check": "IN ('admin', 'doctor', 'nurse', 'pharmacist', 'technician', 'driver', 'worker')"},
+        {"name": "position", "type": "VARCHAR(100)", "nullable": true},
+        {"name": "department_id", "type": "INTEGER", "nullable": true, "foreign_key": "departments.department_id"},
+        {"name": "hire_date", "type": "DATE", "nullable": true},
+        {"name": "salary", "type": "DECIMAL(12,2)", "nullable": true},
+        {"name": "is_active", "type": "BOOLEAN", "default": true},
+        {"name": "created_at", "type": "TIMESTAMPTZ", "default": "CURRENT_TIMESTAMP"},
+        {"name": "updated_at", "type": "TIMESTAMPTZ", "default": "CURRENT_TIMESTAMP"}
+      ]
+    },
+    {
+      "name": "doctors",
+      "description": "Specialized medical doctors",
+      "category": "Personnel", 
+      "columns": [
+        {"name": "doctor_id", "type": "SERIAL", "primary": true},
+        {"name": "staff_id", "type": "INTEGER", "unique": true, "nullable": true, "foreign_key": "staff.staff_id"},
+        {"name": "user_id", "type": "UUID", "unique": true, "nullable": true, "foreign_key": "users.user_id"},
+        {"name": "first_name", "type": "VARCHAR(50)", "nullable": false},
+        {"name": "last_name", "type": "VARCHAR(50)", "nullable": false},
+        {"name": "specialty", "type": "VARCHAR(100)", "nullable": false},
+        {"name": "phone", "type": "VARCHAR(20)", "nullable": true},
+        {"name": "email", "type": "VARCHAR(100)", "nullable": true},
+        {"name": "license_number", "type": "VARCHAR(50)", "nullable": true},
+        {"name": "available_schedule", "type": "TEXT", "nullable": true},
+        {"name": "consultation_fee", "type": "DECIMAL(10,2)", "nullable": true},
+        {"name": "is_active", "type": "BOOLEAN", "default": true},
+        {"name": "created_at", "type": "TIMESTAMPTZ", "default": "CURRENT_TIMESTAMP"}
+      ]
+    },
+    {
+      "name": "patients",
+      "description": "Hospital patients registry",
+      "category": "Patients",
+      "columns": [
+        {"name": "patient_id", "type": "SERIAL", "primary": true},
+        {"name": "patient_code", "type": "VARCHAR(20)", "unique": true, "nullable": false},
+        {"name": "user_id", "type": "UUID", "unique": true, "nullable": true, "foreign_key": "users.user_id"},
+        {"name": "first_name", "type": "VARCHAR(50)", "nullable": false},
+        {"name": "last_name", "type": "VARCHAR(50)", "nullable": false},
+        {"name": "date_of_birth", "type": "DATE", "nullable": true},
+        {"name": "gender", "type": "VARCHAR(10)", "nullable": true, "check": "IN ('male', 'female', 'other')"},
+        {"name": "phone", "type": "VARCHAR(20)", "nullable": true},
+        {"name": "email", "type": "VARCHAR(100)", "nullable": true},
+        {"name": "address", "type": "TEXT", "nullable": true},
+        {"name": "emergency_contact_name", "type": "VARCHAR(100)", "nullable": true},
+        {"name": "emergency_contact_phone", "type": "VARCHAR(20)", "nullable": true},
+        {"name": "blood_type", "type": "VARCHAR(5)", "nullable": true},
+        {"name": "allergies", "type": "TEXT", "nullable": true},
+        {"name": "medical_history", "type": "TEXT", "nullable": true},
+        {"name": "insurance_number", "type": "VARCHAR(50)", "nullable": true},
+        {"name": "is_active", "type": "BOOLEAN", "default": true},
+        {"name": "created_at", "type": "TIMESTAMPTZ", "default": "CURRENT_TIMESTAMP"},
+        {"name": "updated_at", "type": "TIMESTAMPTZ", "default": "CURRENT_TIMESTAMP"}
+      ]
+    },
+    {
+      "name": "appointments", 
+      "description": "Patient-doctor appointments scheduling",
+      "category": "Medical Services",
+      "columns": [
+        {"name": "appointment_id", "type": "SERIAL", "primary": true},
+        {"name": "patient_id", "type": "INTEGER", "nullable": false, "foreign_key": "patients.patient_id"},
+        {"name": "doctor_id", "type": "INTEGER", "nullable": false, "foreign_key": "doctors.doctor_id"},
+        {"name": "appointment_date", "type": "DATE", "nullable": false},
+        {"name": "appointment_time", "type": "TIME", "nullable": false},
+        {"name": "duration_minutes", "type": "INTEGER", "default": 30},
+        {"name": "appointment_type", "type": "VARCHAR(50)", "nullable": true},
+        {"name": "reason", "type": "TEXT", "nullable": true},
+        {"name": "status", "type": "VARCHAR(20)", "default": "scheduled", "check": "IN ('scheduled', 'confirmed', 'in_progress', 'completed', 'cancelled', 'no_show')"},
+        {"name": "notes", "type": "TEXT", "nullable": true},
+        {"name": "created_by_user_id", "type": "UUID", "nullable": true, "foreign_key": "users.user_id"},
+        {"name": "created_at", "type": "TIMESTAMPTZ", "default": "CURRENT_TIMESTAMP"},
+        {"name": "updated_at", "type": "TIMESTAMPTZ", "default": "CURRENT_TIMESTAMP"}
+      ]
+    },
+    {
+      "name": "medical_records",
+      "description": "Patient medical history and visit records",
+      "category": "Medical Services",
+      "columns": [
+        {"name": "record_id", "type": "SERIAL", "primary": true},
+        {"name": "patient_id", "type": "INTEGER", "nullable": false, "foreign_key": "patients.patient_id"},
+        {"name": "doctor_id", "type": "INTEGER", "nullable": true, "foreign_key": "doctors.doctor_id"},
+        {"name": "visit_date", "type": "DATE", "nullable": false},
+        {"name": "diagnosis", "type": "TEXT", "nullable": true},
+        {"name": "symptoms", "type": "TEXT", "nullable": true},
+        {"name": "treatment", "type": "TEXT", "nullable": true},
+        {"name": "notes", "type": "TEXT", "nullable": true},
+        {"name": "vital_signs", "type": "JSONB", "nullable": true},
+        {"name": "lab_results", "type": "JSONB", "nullable": true},
+        {"name": "follow_up_date", "type": "DATE", "nullable": true},
+        {"name": "created_by_user_id", "type": "UUID", "nullable": true, "foreign_key": "users.user_id"},
+        {"name": "created_at", "type": "TIMESTAMPTZ", "default": "CURRENT_TIMESTAMP"},
+        {"name": "updated_at", "type": "TIMESTAMPTZ", "default": "CURRENT_TIMESTAMP"}
+      ]
+    },
+    {
+      "name": "medicine",
+      "description": "Hospital pharmacy inventory",
+      "category": "Pharmacy",
+      "columns": [
+        {"name": "medicine_id", "type": "SERIAL", "primary": true},
+        {"name": "medicine_name", "type": "VARCHAR(200)", "nullable": false},
+        {"name": "generic_name", "type": "VARCHAR(200)", "nullable": true},
+        {"name": "manufacturer", "type": "VARCHAR(100)", "nullable": true},
+        {"name": "category", "type": "VARCHAR(50)", "nullable": true},
+        {"name": "dosage_form", "type": "VARCHAR(50)", "nullable": true},
+        {"name": "strength", "type": "VARCHAR(50)", "nullable": true},
+        {"name": "unit_price", "type": "DECIMAL(10,2)", "nullable": true},
+        {"name": "stock_quantity", "type": "INTEGER", "default": 0},
+        {"name": "min_stock_level", "type": "INTEGER", "default": 10},
+        {"name": "max_stock_level", "type": "INTEGER", "default": 1000},
+        {"name": "expiry_date", "type": "DATE", "nullable": true},
+        {"name": "batch_number", "type": "VARCHAR(50)", "nullable": true},
+        {"name": "storage_conditions", "type": "TEXT", "nullable": true},
+        {"name": "is_active", "type": "BOOLEAN", "default": true},
+        {"name": "created_at", "type": "TIMESTAMPTZ", "default": "CURRENT_TIMESTAMP"},
+        {"name": "updated_at", "type": "TIMESTAMPTZ", "default": "CURRENT_TIMESTAMP"}
+      ]
+    },
+    {
+      "name": "prescriptions",
+      "description": "Doctor prescriptions for patients",
+      "category": "Pharmacy",
+      "columns": [
+        {"name": "prescription_id", "type": "SERIAL", "primary": true},
+        {"name": "patient_id", "type": "INTEGER", "nullable": false, "foreign_key": "patients.patient_id"},
+        {"name": "doctor_id", "type": "INTEGER", "nullable": false, "foreign_key": "doctors.doctor_id"},
+        {"name": "prescription_date", "type": "DATE", "nullable": false},
+        {"name": "status", "type": "VARCHAR(20)", "default": "pending", "check": "IN ('pending', 'filled', 'partially_filled', 'cancelled')"},
+        {"name": "total_amount", "type": "DECIMAL(10,2)", "nullable": true},
+        {"name": "notes", "type": "TEXT", "nullable": true},
+        {"name": "created_at", "type": "TIMESTAMPTZ", "default": "CURRENT_TIMESTAMP"}
+      ]
+    },
+    {
+      "name": "prescription_items",
+      "description": "Individual medicines in prescriptions",
+      "category": "Pharmacy",
+      "columns": [
+        {"name": "item_id", "type": "SERIAL", "primary": true},
+        {"name": "prescription_id", "type": "INTEGER", "nullable": false, "foreign_key": "prescriptions.prescription_id"},
+        {"name": "medicine_id", "type": "INTEGER", "nullable": false, "foreign_key": "medicine.medicine_id"},
+        {"name": "quantity", "type": "INTEGER", "nullable": false},
+        {"name": "dosage", "type": "VARCHAR(100)", "nullable": true},
+        {"name": "frequency", "type": "VARCHAR(100)", "nullable": true},
+        {"name": "duration", "type": "VARCHAR(100)", "nullable": true},
+        {"name": "instructions", "type": "TEXT", "nullable": true},
+        {"name": "unit_price", "type": "DECIMAL(10,2)", "nullable": true},
+        {"name": "total_price", "type": "DECIMAL(10,2)", "nullable": true}
+      ]
+    },
+    {
+      "name": "pharmacy_records",
+      "description": "Pharmacy dispensing records",
+      "category": "Pharmacy",
+      "columns": [
+        {"name": "record_id", "type": "SERIAL", "primary": true},
+        {"name": "patient_id", "type": "INTEGER", "nullable": false, "foreign_key": "patients.patient_id"},
+        {"name": "prescription_id", "type": "INTEGER", "nullable": true, "foreign_key": "prescriptions.prescription_id"},
+        {"name": "pharmacist_id", "type": "INTEGER", "nullable": true, "foreign_key": "staff.staff_id"},
+        {"name": "dispensed_date", "type": "DATE", "nullable": false},
+        {"name": "total_amount", "type": "DECIMAL(10,2)", "nullable": true},
+        {"name": "status", "type": "VARCHAR(20)", "default": "dispensed", "check": "IN ('dispensed', 'returned', 'cancelled')"},
+        {"name": "notes", "type": "TEXT", "nullable": true},
+        {"name": "created_at", "type": "TIMESTAMPTZ", "default": "CURRENT_TIMESTAMP"}
+      ]
+    },
+    {
+      "name": "room_types",
+      "description": "Hospital room categories",
+      "category": "Facilities",
+      "columns": [
+        {"name": "room_type_id", "type": "SERIAL", "primary": true},
+        {"name": "type_name", "type": "VARCHAR(50)", "unique": true, "nullable": false},
+        {"name": "description", "type": "TEXT", "nullable": true},
+        {"name": "base_rate", "type": "DECIMAL(10,2)", "nullable": true},
+        {"name": "capacity", "type": "INTEGER", "nullable": true},
+        {"name": "amenities", "type": "JSONB", "nullable": true},
+        {"name": "is_active", "type": "BOOLEAN", "default": true},
+        {"name": "created_at", "type": "TIMESTAMPTZ", "default": "CURRENT_TIMESTAMP"}
+      ]
+    },
+    {
+      "name": "rooms",
+      "description": "Hospital room inventory",
+      "category": "Facilities",
+      "columns": [
+        {"name": "room_id", "type": "SERIAL", "primary": true},
+        {"name": "room_number", "type": "VARCHAR(20)", "unique": true, "nullable": false},
+        {"name": "room_type_id", "type": "INTEGER", "nullable": false, "foreign_key": "room_types.room_type_id"},
+        {"name": "floor_number", "type": "INTEGER", "nullable": true},
+        {"name": "building", "type": "VARCHAR(50)", "nullable": true},
+        {"name": "capacity", "type": "INTEGER", "default": 1},
+        {"name": "current_occupancy", "type": "INTEGER", "default": 0},
+        {"name": "status", "type": "VARCHAR(20)", "default": "available", "check": "IN ('available', 'occupied', 'maintenance', 'out_of_service')"},
+        {"name": "daily_rate", "type": "DECIMAL(10,2)", "nullable": true},
+        {"name": "equipment", "type": "JSONB", "nullable": true},
+        {"name": "last_cleaned", "type": "TIMESTAMPTZ", "nullable": true},
+        {"name": "is_active", "type": "BOOLEAN", "default": true},
+        {"name": "created_at", "type": "TIMESTAMPTZ", "default": "CURRENT_TIMESTAMP"},
+        {"name": "updated_at", "type": "TIMESTAMPTZ", "default": "CURRENT_TIMESTAMP"}
+      ]
+    },
+    {
+      "name": "room_assignments",
+      "description": "Patient room assignment tracking",
+      "category": "Facilities",
+      "columns": [
+        {"name": "assignment_id", "type": "SERIAL", "primary": true},
+        {"name": "patient_id", "type": "INTEGER", "nullable": false, "foreign_key": "patients.patient_id"},
+        {"name": "room_id", "type": "INTEGER", "nullable": false, "foreign_key": "rooms.room_id"},
+        {"name": "staff_id", "type": "INTEGER", "nullable": true, "foreign_key": "staff.staff_id"},
+        {"name": "assignment_type", "type": "VARCHAR(50)", "nullable": true, "check": "IN ('admission', 'transfer', 'discharge')"},
+        {"name": "assigned_date", "type": "DATE", "nullable": false},
+        {"name": "assigned_time", "type": "TIME", "nullable": true},
+        {"name": "expected_discharge_date", "type": "DATE", "nullable": true},
+        {"name": "actual_discharge_date", "type": "DATE", "nullable": true},
+        {"name": "status", "type": "VARCHAR(20)", "default": "active", "check": "IN ('active', 'completed', 'cancelled')"},
+        {"name": "notes", "type": "TEXT", "nullable": true},
+        {"name": "assigned_by_user_id", "type": "UUID", "nullable": true, "foreign_key": "users.user_id"},
+        {"name": "created_at", "type": "TIMESTAMPTZ", "default": "CURRENT_TIMESTAMP"}
+      ]
+    },
+    {
+      "name": "ambulances",
+      "description": "Hospital ambulance fleet",
+      "category": "Support Services",
+      "columns": [
+        {"name": "ambulance_id", "type": "SERIAL", "primary": true},
+        {"name": "ambulance_number", "type": "VARCHAR(10)", "unique": true, "nullable": false},
+        {"name": "vehicle_model", "type": "VARCHAR(100)", "nullable": true},
+        {"name": "license_plate", "type": "VARCHAR(20)", "nullable": true},
+        {"name": "driver_id", "type": "INTEGER", "nullable": true, "foreign_key": "staff.staff_id"},
+        {"name": "status", "type": "VARCHAR(20)", "default": "available", "check": "IN ('available', 'in_service', 'maintenance', 'out_of_service')"},
+        {"name": "fuel_level", "type": "INTEGER", "nullable": true, "check": "fuel_level >= 0 AND fuel_level <= 100"},
+        {"name": "mileage", "type": "INTEGER", "default": 0},
+        {"name": "last_maintenance_date", "type": "DATE", "nullable": true},
+        {"name": "next_maintenance_date", "type": "DATE", "nullable": true},
+        {"name": "equipment", "type": "JSONB", "nullable": true},
+        {"name": "is_active", "type": "BOOLEAN", "default": true},
+        {"name": "created_at", "type": "TIMESTAMPTZ", "default": "CURRENT_TIMESTAMP"},
+        {"name": "updated_at", "type": "TIMESTAMPTZ", "default": "CURRENT_TIMESTAMP"}
+      ]
+    },
+    {
+      "name": "ambulance_logs",
+      "description": "Ambulance service tracking",
+      "category": "Support Services",
+      "columns": [
+        {"name": "log_id", "type": "SERIAL", "primary": true},
+        {"name": "ambulance_id", "type": "INTEGER", "nullable": false, "foreign_key": "ambulances.ambulance_id"},
+        {"name": "patient_id", "type": "INTEGER", "nullable": true, "foreign_key": "patients.patient_id"},
+        {"name": "driver_id", "type": "INTEGER", "nullable": false, "foreign_key": "staff.staff_id"},
+        {"name": "call_time", "type": "TIMESTAMPTZ", "nullable": false},
+        {"name": "pickup_location", "type": "TEXT", "nullable": true},
+        {"name": "destination", "type": "TEXT", "nullable": true},
+        {"name": "pickup_time", "type": "TIMESTAMPTZ", "nullable": true},
+        {"name": "arrival_time", "type": "TIMESTAMPTZ", "nullable": true},
+        {"name": "priority_level", "type": "VARCHAR(20)", "nullable": true, "check": "IN ('low', 'medium', 'high', 'critical')"},
+        {"name": "status", "type": "VARCHAR(20)", "default": "dispatched", "check": "IN ('dispatched', 'en_route', 'arrived', 'transporting', 'completed', 'cancelled')"},
+        {"name": "distance_km", "type": "DECIMAL(6,2)", "nullable": true},
+        {"name": "fuel_consumed", "type": "DECIMAL(6,2)", "nullable": true},
+        {"name": "notes", "type": "TEXT", "nullable": true},
+        {"name": "created_at", "type": "TIMESTAMPTZ", "default": "CURRENT_TIMESTAMP"}
+      ]
+    },
+    {
+      "name": "cleaning_service",
+      "description": "Hospital cleaning and maintenance tracking",
+      "category": "Support Services",
+      "columns": [
+        {"name": "cleaning_id", "type": "SERIAL", "primary": true},
+        {"name": "room_id", "type": "INTEGER", "nullable": false, "foreign_key": "rooms.room_id"},
+        {"name": "staff_id", "type": "INTEGER", "nullable": false, "foreign_key": "staff.staff_id"},
+        {"name": "cleaning_date", "type": "DATE", "nullable": false},
+        {"name": "cleaning_time", "type": "TIME", "nullable": true},
+        {"name": "cleaning_type", "type": "VARCHAR(50)", "nullable": true, "check": "IN ('routine', 'deep', 'disinfection', 'maintenance')"},
+        {"name": "duration_minutes", "type": "INTEGER", "nullable": true},
+        {"name": "supplies_used", "type": "JSONB", "nullable": true},
+        {"name": "quality_rating", "type": "INTEGER", "nullable": true, "check": "quality_rating >= 1 AND quality_rating <= 5"},
+        {"name": "status", "type": "VARCHAR(20)", "default": "scheduled", "check": "IN ('scheduled', 'in_progress', 'completed', 'cancelled')"},
+        {"name": "notes", "type": "TEXT", "nullable": true},
+        {"name": "cleaned_by_user_id", "type": "UUID", "nullable": true, "foreign_key": "users.user_id"},
+        {"name": "created_at", "type": "TIMESTAMPTZ", "default": "CURRENT_TIMESTAMP"}
+      ]
+    },
+    {
+      "name": "billing",
+      "description": "Hospital billing and payment tracking",
+      "category": "Financial",
+      "columns": [
+        {"name": "bill_id", "type": "SERIAL", "primary": true},
+        {"name": "patient_id", "type": "INTEGER", "nullable": false, "foreign_key": "patients.patient_id"},
+        {"name": "bill_date", "type": "DATE", "nullable": false},
+        {"name": "due_date", "type": "DATE", "nullable": true},
+        {"name": "total_amount", "type": "DECIMAL(12,2)", "nullable": false},
+        {"name": "paid_amount", "type": "DECIMAL(12,2)", "default": 0},
+        {"name": "discount_amount", "type": "DECIMAL(12,2)", "default": 0},
+        {"name": "tax_amount", "type": "DECIMAL(12,2)", "default": 0},
+        {"name": "payment_status", "type": "VARCHAR(20)", "default": "pending", "check": "IN ('pending', 'partial', 'paid', 'overdue', 'cancelled')"},
+        {"name": "payment_method", "type": "VARCHAR(50)", "nullable": true},
+        {"name": "insurance_claim_amount", "type": "DECIMAL(12,2)", "default": 0},
+        {"name": "notes", "type": "TEXT", "nullable": true},
+        {"name": "processed_by_user_id", "type": "UUID", "nullable": true, "foreign_key": "users.user_id"},
+        {"name": "created_at", "type": "TIMESTAMPTZ", "default": "CURRENT_TIMESTAMP"},
+        {"name": "updated_at", "type": "TIMESTAMPTZ", "default": "CURRENT_TIMESTAMP"}
+      ]
+    }
+  ],
+  "relationships": [
+    {
+      "from": "users",
+      "to": "user_roles", 
+      "type": "one-to-many",
+      "on": "user_id"
+    },
+    {
+      "from": "roles",
+      "to": "user_roles",
+      "type": "one-to-many", 
+      "on": "role_id"
+    },
+    {
+      "from": "users",
+      "to": "patients",
+      "type": "one-to-one",
+      "on": "user_id"
+    },
+    {
+      "from": "users", 
+      "to": "staff",
+      "type": "one-to-one",
+      "on": "user_id"
+    },
+    {
+      "from": "departments",
+      "to": "staff",
+      "type": "one-to-many",
+      "on": "department_id"
+    },
+    {
+      "from": "staff",
+      "to": "doctors",
+      "type": "one-to-one",
+      "on": "staff_id"
+    },
+    {
+      "from": "patients",
+      "to": "appointments",
+      "type": "one-to-many",
+      "on": "patient_id"
+    },
+    {
+      "from": "doctors",
+      "to": "appointments",
+      "type": "one-to-many",
+      "on": "doctor_id"
+    },
+    {
+      "from": "patients",
+      "to": "medical_records",
+      "type": "one-to-many",
+      "on": "patient_id"
+    },
+    {
+      "from": "doctors",
+      "to": "medical_records",
+      "type": "one-to-many", 
+      "on": "doctor_id"
+    },
+    {
+      "from": "patients",
+      "to": "prescriptions",
+      "type": "one-to-many",
+      "on": "patient_id"
+    },
+    {
+      "from": "doctors",
+      "to": "prescriptions",
+      "type": "one-to-many",
+      "on": "doctor_id"
+    },
+    {
+      "from": "prescriptions",
+      "to": "prescription_items",
+      "type": "one-to-many",
+      "on": "prescription_id"
+    },
+    {
+      "from": "medicine",
+      "to": "prescription_items",
+      "type": "one-to-many",
+      "on": "medicine_id"
+    },
+    {
+      "from": "room_types",
+      "to": "rooms",
+      "type": "one-to-many",
+      "on": "room_type_id"
+    },
+    {
+      "from": "patients",
+      "to": "room_assignments",
+      "type": "one-to-many",
+      "on": "patient_id"
+    },
+    {
+      "from": "rooms",
+      "to": "room_assignments",
+      "type": "one-to-many",
+      "on": "room_id"
+    },
+    {
+      "from": "staff",
+      "to": "ambulances",
+      "type": "one-to-many",
+      "on": "driver_id"
+    },
+    {
+      "from": "ambulances",
+      "to": "ambulance_logs",
+      "type": "one-to-many",
+      "on": "ambulance_id"
+    },
+    {
+      "from": "patients",
+      "to": "billing",
+      "type": "one-to-many",
+      "on": "patient_id"
+    }
+  ],
+  "indexes": [
+    {"table": "users", "columns": ["email"], "type": "unique"},
+    {"table": "users", "columns": ["is_active"], "type": "btree"},
+    {"table": "patients", "columns": ["patient_code"], "type": "unique"},
+    {"table": "patients", "columns": ["user_id"], "type": "btree"},
+    {"table": "staff", "columns": ["employee_id"], "type": "unique"},
+    {"table": "staff", "columns": ["user_id"], "type": "btree"},
+    {"table": "staff", "columns": ["department_id"], "type": "btree"},
+    {"table": "appointments", "columns": ["patient_id"], "type": "btree"},
+    {"table": "appointments", "columns": ["doctor_id"], "type": "btree"},
+    {"table": "appointments", "columns": ["appointment_date"], "type": "btree"},
+    {"table": "medical_records", "columns": ["patient_id"], "type": "btree"},
+    {"table": "medical_records", "columns": ["visit_date"], "type": "btree"},
+    {"table": "billing", "columns": ["patient_id"], "type": "btree"},
+    {"table": "billing", "columns": ["payment_status"], "type": "btree"}
+  ],
+  "views": [
+    {
+      "name": "patient_summary",
+      "description": "Comprehensive patient information view",
+      "tables": ["patients", "users"]
+    },
+    {
+      "name": "staff_summary", 
+      "description": "Staff information with department details",
+      "tables": ["staff", "departments", "users"]
+    },
+    {
+      "name": "appointment_summary",
+      "description": "Appointment details with patient and doctor info",
+      "tables": ["appointments", "patients", "doctors"]
+    }
+  ],
+  "security": {
+    "rls_enabled": true,
+    "protected_tables": [
+      "users", "patients", "staff", "medical_records", 
+      "appointments", "prescriptions", "billing"
+    ],
+    "audit_enabled": true,
+    "encryption": ["password_hash", "token_hash"]
+  }
+}

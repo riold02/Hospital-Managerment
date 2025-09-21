@@ -29,8 +29,10 @@ app.use(securityHeaders);
 const allowedOrigins = process.env.CORS_ORIGIN?.split(',') || [
   'http://localhost:3000',
   'http://localhost:3001',
+  'http://localhost:3002',
   'https://localhost:3000',
-  'https://localhost:3001'
+  'https://localhost:3001',
+  'https://localhost:3002'
 ];
 
 app.use(cors({

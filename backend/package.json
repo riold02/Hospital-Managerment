@@ -8,11 +8,22 @@
     "dev": "nodemon server.js",
     "test": "jest",
     "test:watch": "jest --watch",
+    "test:connection": "node scripts/test-connection.js",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate deploy",
-    "prisma:studio": "prisma studio"
+    "prisma:studio": "prisma studio",
+    "docker:build": "docker build -t hospital-backend .",
+    "docker:build:dev": "docker build -f Dockerfile.dev -t hospital-backend:dev .",
+    "docker:run": "docker run -p 3001:3001 --env-file .env hospital-backend",
+    "docker:run:dev": "docker run -p 3001:3001 --env-file .env.development -v $(pwd):/app hospital-backend:dev",
+    "docker:up": "docker-compose up -d",
+    "docker:up:dev": "docker-compose -f docker-compose.dev.yml up -d",
+    "docker:down": "docker-compose down",
+    "docker:down:dev": "docker-compose -f docker-compose.dev.yml down",
+    "docker:logs": "docker-compose logs -f",
+    "docker:logs:dev": "docker-compose -f docker-compose.dev.yml logs -f"
   },
   "keywords": [
     "hospital",

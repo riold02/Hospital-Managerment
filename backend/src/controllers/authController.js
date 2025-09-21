@@ -47,23 +47,9 @@ class AuthController {
       // Hash password
       const hashedPassword = await bcrypt.hash(password, 12);
 
-      // Use transaction to create both patient and user records
+      // Use transaction to create user, assign role, and create patient record
       const result = await prisma.$transaction(async (tx) => {
-        // Create patient record first
-        const patient = await tx.patients.create({
-          data: {
-            first_name,
-            last_name,
-            email,
-            date_of_birth: new Date(date_of_birth),
-            gender,
-            contact_number,
-            address,
-            medical_history: null
-          }
-        });
-
-        // Create user record for authentication
+        // Step 1: Create user record for authentication
         const user = await tx.users.create({
           data: {
             email,
@@ -72,7 +58,44 @@ class AuthController {
           }
         });
 
-        return { patient, user };
+        // Step 2: Get patient role and assign to user
+        const patientRole = await tx.roles.findFirst({
+          where: { role_name: 'patient', is_active: true }
+        });
+
+        if (patientRole) {
+          await tx.user_roles.create({
+            data: {
+              user_id: user.user_id,
+              role_id: patientRole.role_id,
+              assigned_at: new Date(),
+              is_active: true
+            }
+          });
+        }
+
+        // Step 3: Create patient record with user_id link
+        // Generate patient code - P + timestamp + random
+        const patientCode = `P${Date.now()}${Math.floor(Math.random() * 1000).toString().padStart(3, '0')}`;
+        
+        const patient = await tx.patients.create({
+          data: {
+            patient_code: patientCode,
+            first_name,
+            last_name,
+            email,
+            date_of_birth: new Date(date_of_birth),
+            gender,
+            phone: contact_number, // Map contact_number to phone column
+            address,
+            medical_history: null,
+            user: {
+              connect: { user_id: user.user_id }
+            }
+          }
+        });
+
+        return { patient, user, role: patientRole };
       });
 
       // Generate JWT token
@@ -80,7 +103,7 @@ class AuthController {
         {
           id: result.user.user_id,
           email: result.user.email,
-          role: result.user.role,
+          role: 'patient',
           patient_id: result.patient.patient_id
         },
         process.env.JWT_SECRET,
@@ -93,7 +116,7 @@ class AuthController {
           user: {
             id: result.user.user_id,
             email: result.user.email,
-            role: result.user.role,
+            role: 'patient',
             patient: result.patient
           },
           token
@@ -156,18 +179,44 @@ class AuthController {
       // Hash password
       const hashedPassword = await bcrypt.hash(password, 12);
 
-      // Use transaction to create both staff and user records
+      // Use transaction to create user, assign role, and create staff record
       const result = await prisma.$transaction(async (tx) => {
-        // Create staff record first
+        // Step 1: Create user record for authentication
+        const user = await tx.users.create({
+          data: {
+            email,
+            password_hash: hashedPassword,
+            is_active: true
+          }
+        });
+
+        // Step 2: Get staff role and assign to user
+        const staffRole = await tx.roles.findFirst({
+          where: { role_name: role, is_active: true }
+        });
+
+        if (staffRole) {
+          await tx.user_roles.create({
+            data: {
+              user_id: user.user_id,
+              role_id: staffRole.role_id,
+              assigned_at: new Date(),
+              is_active: true
+            }
+          });
+        }
+
+        // Step 3: Create staff record with user_id link
         const staff = await tx.staff.create({
           data: {
+            user_id: user.user_id, // Link to user record
             first_name,
             last_name,
             email,
             role,
             position,
             department_id: department_id ? Number(department_id) : null,
-            contact_number
+            phone: contact_number // Map contact_number to phone column
           },
           include: {
             departments: {
@@ -179,16 +228,7 @@ class AuthController {
           }
         });
 
-        // Create user record for authentication
-        const user = await tx.users.create({
-          data: {
-            email,
-            password_hash: hashedPassword,
-            is_active: true
-          }
-        });
-
-        return { staff, user };
+        return { staff, user, role: staffRole };
       });
 
       // Generate JWT token
@@ -196,7 +236,7 @@ class AuthController {
         {
           id: result.user.user_id,
           email: result.user.email,
-          role: result.user.role,
+          role: result.role?.role_name || role,
           staff_id: result.staff.staff_id
         },
         process.env.JWT_SECRET,
@@ -208,7 +248,7 @@ class AuthController {
         data: {
           token,
           user: result.staff,
-          role: result.staff.role
+          role: result.role?.role_name || role
         },
         message: 'Staff registered successfully'
       });
@@ -235,11 +275,34 @@ class AuthController {
 
       const { email, password } = req.body;
 
-      // Find user in users table
+      // Find user in users table with role information
       const user = await prisma.users.findFirst({
         where: {
           email,
           is_active: true
+        },
+        include: {
+          user_roles: {
+            include: {
+              role: true
+            }
+          },
+          patient: {
+            select: {
+              patient_id: true,
+              first_name: true,
+              last_name: true
+            }
+          },
+          staff_member: {
+            select: {
+              staff_id: true,
+              first_name: true,
+              last_name: true,
+              role: true,
+              department_id: true
+            }
+          }
         }
       });
 
@@ -284,14 +347,20 @@ class AuthController {
         additionalInfo = { staff };
       }
 
+      // Get user role and additional info
+      const userRole = user.user_roles?.[0]?.role?.role_name || 'patient';
+      const patientId = user.patient?.patient_id || null;
+      const staffId = user.staff_member?.staff_id || null;
+
       // Generate JWT token
       const token = jwt.sign(
         {
           id: user.user_id,
+          user_id: user.user_id,
           email: user.email,
-          role: user.role,
-          patient_id: user.patient_id,
-          staff_id: user.staff_id
+          role: userRole,
+          patient_id: patientId,
+          staff_id: staffId
         },
         process.env.JWT_SECRET,
         { expiresIn: process.env.JWT_EXPIRES_IN }
@@ -302,8 +371,18 @@ class AuthController {
         data: {
           user: {
             id: user.user_id,
+            user_id: user.user_id,
             email: user.email,
-            role: user.role,
+            role: userRole,
+            roles: user.user_roles?.map(ur => ur.role.role_name) || [userRole],
+            patient_id: patientId,
+            staff_id: staffId,
+            profile: {
+              first_name: user.patient?.first_name || user.staff_member?.first_name,
+              last_name: user.patient?.last_name || user.staff_member?.last_name,
+              position: user.staff_member?.position || null,
+              staff_role: user.staff_member?.role || null
+            },
             ...additionalInfo
           },
           token
@@ -322,38 +401,19 @@ class AuthController {
   // Get current user info
   async getMe(req, res) {
     try {
-      const { user } = req; // From auth middleware
+      const { user } = req; // Already enriched by authenticateToken with roles & permissions
 
-      let userData = null;
-
-      if (user.patient_id) {
-        userData = await prisma.patients.findUnique({
-          where: { patient_id: user.patient_id }
-        });
-      } else if (user.staff_id) {
-        userData = await prisma.staff.findUnique({
-          where: { staff_id: user.staff_id },
-          include: {
-            departments: {
-              select: {
-                department_id: true,
-                department_name: true
-              }
-            }
-          }
-        });
-      }
-
-      if (!userData) {
-        return res.status(404).json({
+      if (!user) {
+        return res.status(401).json({
           success: false,
-          error: 'User not found'
+          error: 'Unauthorized'
         });
       }
 
+      // Return the unified user object including roles/permissions
       res.json({
         success: true,
-        data: userData
+        data: user
       });
     } catch (error) {
       console.error('Get me error:', error);

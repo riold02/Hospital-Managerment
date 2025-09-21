@@ -167,10 +167,9 @@ BEGIN
         
         -- Assign role to user if found
         IF target_role_id IS NOT NULL THEN
-            INSERT INTO user_roles (user_id, role_id, assigned_at, is_active)
-            VALUES (NEW.user_id, target_role_id, CURRENT_TIMESTAMP, true)
+            INSERT INTO user_roles (user_id, role_id, assigned_at)
+            VALUES (NEW.user_id, target_role_id, CURRENT_TIMESTAMP)
             ON CONFLICT (user_id, role_id) DO UPDATE SET
-                is_active = true,
                 assigned_at = CURRENT_TIMESTAMP;
         END IF;
     END IF;
@@ -203,10 +202,9 @@ BEGIN
         
         -- Assign patient role
         IF patient_role_id IS NOT NULL THEN
-            INSERT INTO user_roles (user_id, role_id, assigned_at, is_active)
-            VALUES (NEW.user_id, patient_role_id, CURRENT_TIMESTAMP, true)
+            INSERT INTO user_roles (user_id, role_id, assigned_at)
+            VALUES (NEW.user_id, patient_role_id, CURRENT_TIMESTAMP)
             ON CONFLICT (user_id, role_id) DO UPDATE SET
-                is_active = true,
                 assigned_at = CURRENT_TIMESTAMP;
         END IF;
     END IF;

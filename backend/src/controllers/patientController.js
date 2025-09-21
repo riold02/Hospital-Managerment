@@ -146,15 +146,25 @@ class PatientController {
       }
 
       const { id } = req.params;
+      
+      // Map gender from M/F/O to male/female/other for database
+      const genderMapping = { 'M': 'male', 'F': 'female', 'O': 'other' };
+      const mappedGender = req.body.gender ? genderMapping[req.body.gender] : undefined;
+      
       const updateData = {
         first_name: req.body.first_name,
         last_name: req.body.last_name,
         date_of_birth: req.body.date_of_birth ? new Date(req.body.date_of_birth) : undefined,
-        gender: req.body.gender,
-        contact_number: req.body.contact_number,
+        gender: mappedGender,
+        phone: req.body.phone,
         address: req.body.address,
         email: req.body.email,
-        medical_history: req.body.medical_history
+        medical_history: req.body.medical_history,
+        emergency_contact_name: req.body.emergency_contact_name,
+        emergency_contact_phone: req.body.emergency_contact_phone,
+        blood_type: req.body.blood_type,
+        allergies: req.body.allergies,
+        insurance_number: req.body.insurance_number
       };
 
       // Check if email already exists for other patients

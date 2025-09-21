@@ -26,16 +26,37 @@ Thư mục này chứa các file migration SQL để quản lý schema database 
 - **Dependencies**: 001_initial_schema.sql
 - **Tạo**: 2025-09-09
 
-### 003_rbac_seed_data.sql
-- **Mục đích**: Seed dữ liệu ban đầu cho RBAC system
+### 004_password_reset_tokens.sql
+- **Mục đích**: Thêm hệ thống reset password an toàn
 - **Nội dung**:
-  - 8 roles cơ bản (admin, doctor, nurse, pharmacist, technician, driver, worker, patient)
-  - 50+ permissions chi tiết cho các resource và actions
-  - Mapping permissions cho từng role
-  - Admin user mặc định (admin@hospital.com / admin123)
-  - Demo users cho testing
+  - Bảng password_reset_tokens với token hashing
+  - Expiration time và used_at tracking
+  - Indexes để tối ưu tra cứu token
+  - Security measures cho password reset flow
 - **Dependencies**: 002_rbac_system.sql
 - **Tạo**: 2025-09-09
+
+### 005_link_user_business_tables.sql
+- **Mục đích**: Liên kết hoàn thiện user system với business tables
+- **Nội dung**:
+  - Thêm user_id references cho doctors, ambulance drivers
+  - Tracking user cho medical_records, prescriptions, billing
+  - User tracking cho pharmacy, room_assignments, cleaning_service
+  - Indexes cho tất cả relationships mới
+- **Dependencies**: 002_rbac_system.sql
+- **Tạo**: 2025-01-27
+
+### 006_sync_current_state.sql
+- **Mục đích**: Đồng bộ hóa migrations với trạng thái database hiện tại
+- **Nội dung**:
+  - Cập nhật cấu trúc bảng staff (employee_id, salary, is_active)
+  - Thêm bảng ambulances và ambulance_logs
+  - Bảng prescription_items và pharmacy_records
+  - Cập nhật medicine, appointments, medical_records, billing
+  - Thêm indexes và triggers cho các bảng mới
+  - Data migrations cho dữ liệu hiện có
+- **Dependencies**: 005_link_user_business_tables.sql
+- **Tạo**: 2025-09-21
 
 ## 🚀 Cách chạy Migrations
 
@@ -48,15 +69,21 @@ cd backend
 # 2. Chạy tất cả migrations theo thứ tự
 docker-compose exec backend bash -c "
   cd /app &&
-  psql postgresql://postgres:postgres@postgres:5432/hospital -f prisma/migrations/001_initial_schema.sql &&
-  psql postgresql://postgres:postgres@postgres:5432/hospital -f prisma/migrations/002_rbac_system.sql &&
-  psql postgresql://postgres:postgres@postgres:5432/hospital -f prisma/migrations/003_rbac_seed_data.sql
+  psql postgresql://hospital_user:hospital_pass@postgres:5432/hospital_db -f prisma/migrations/001_initial_schema.sql &&
+  psql postgresql://hospital_user:hospital_pass@postgres:5432/hospital_db -f prisma/migrations/002_rbac_system.sql &&
+  psql postgresql://hospital_user:hospital_pass@postgres:5432/hospital_db -f prisma/migrations/003_rbac_seed_data.sql &&
+  psql postgresql://hospital_user:hospital_pass@postgres:5432/hospital_db -f prisma/migrations/004_password_reset_tokens.sql &&
+  psql postgresql://hospital_user:hospital_pass@postgres:5432/hospital_db -f prisma/migrations/005_link_user_business_tables.sql &&
+  psql postgresql://hospital_user:hospital_pass@postgres:5432/hospital_db -f prisma/migrations/006_sync_current_state.sql
 "
 
 # 3. Hoặc chạy từng file riêng lẻ
-docker-compose exec backend psql postgresql://postgres:postgres@postgres:5432/hospital -f prisma/migrations/001_initial_schema.sql
-docker-compose exec backend psql postgresql://postgres:postgres@postgres:5432/hospital -f prisma/migrations/002_rbac_system.sql
-docker-compose exec backend psql postgresql://postgres:postgres@postgres:5432/hospital -f prisma/migrations/003_rbac_seed_data.sql
+docker-compose exec backend psql postgresql://hospital_user:hospital_pass@postgres:5432/hospital_db -f prisma/migrations/001_initial_schema.sql
+docker-compose exec backend psql postgresql://hospital_user:hospital_pass@postgres:5432/hospital_db -f prisma/migrations/002_rbac_system.sql
+docker-compose exec backend psql postgresql://hospital_user:hospital_pass@postgres:5432/hospital_db -f prisma/migrations/003_rbac_seed_data.sql
+docker-compose exec backend psql postgresql://hospital_user:hospital_pass@postgres:5432/hospital_db -f prisma/migrations/004_password_reset_tokens.sql
+docker-compose exec backend psql postgresql://hospital_user:hospital_pass@postgres:5432/hospital_db -f prisma/migrations/005_link_user_business_tables.sql
+docker-compose exec backend psql postgresql://hospital_user:hospital_pass@postgres:5432/hospital_db -f prisma/migrations/006_sync_current_state.sql
 ```
 
 ### Trực tiếp từ PostgreSQL Container
@@ -66,9 +93,12 @@ docker-compose exec backend psql postgresql://postgres:postgres@postgres:5432/ho
 docker cp backend/prisma/migrations hospital_postgres:/tmp/migrations
 
 # Chạy migrations
-docker exec hospital_postgres psql -U postgres -d hospital -f /tmp/migrations/001_initial_schema.sql
-docker exec hospital_postgres psql -U postgres -d hospital -f /tmp/migrations/002_rbac_system.sql
-docker exec hospital_postgres psql -U postgres -d hospital -f /tmp/migrations/003_rbac_seed_data.sql
+docker exec hospital_postgres psql -U hospital_user -d hospital_db -f /tmp/migrations/001_initial_schema.sql
+docker exec hospital_postgres psql -U hospital_user -d hospital_db -f /tmp/migrations/002_rbac_system.sql
+docker exec hospital_postgres psql -U hospital_user -d hospital_db -f /tmp/migrations/003_rbac_seed_data.sql
+docker exec hospital_postgres psql -U hospital_user -d hospital_db -f /tmp/migrations/004_password_reset_tokens.sql
+docker exec hospital_postgres psql -U hospital_user -d hospital_db -f /tmp/migrations/005_link_user_business_tables.sql
+docker exec hospital_postgres psql -U hospital_user -d hospital_db -f /tmp/migrations/006_sync_current_state.sql
 ```
 
 ## 🔐 Default Users sau khi Migration

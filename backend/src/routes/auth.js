@@ -11,7 +11,7 @@ const {
   validateForgotPassword,
   validateResetPassword
 } = require('../middleware/validation');
-const { authenticateToken } = require('../middleware/auth');
+const { authenticateToken, requireAdmin } = require('../middleware/auth');
 
 /**
  * @swagger
@@ -142,7 +142,7 @@ router.post('/register/patient', validateRegisterPatientSecure, authController.r
  *       409:
  *         description: Email already exists
  */
-router.post('/register/staff', validateRegisterStaff, authController.registerStaff);
+router.post('/register/staff', authenticateToken, requireAdmin, validateRegisterStaff, authController.registerStaff);
 
 /**
  * @swagger
