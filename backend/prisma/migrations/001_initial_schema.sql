@@ -134,6 +134,7 @@ CREATE TABLE IF NOT EXISTS staff (
 -- Doctors (Extended staff information) 
 CREATE TABLE IF NOT EXISTS doctors (
     doctor_id SERIAL PRIMARY KEY,
+    staff_id INTEGER UNIQUE REFERENCES staff(staff_id) ON DELETE CASCADE,
     user_id UUID UNIQUE REFERENCES users(user_id) ON DELETE SET NULL,
     first_name VARCHAR(50) NOT NULL,
     last_name VARCHAR(50) NOT NULL,
@@ -164,7 +165,7 @@ CREATE TABLE IF NOT EXISTS patients (
     first_name VARCHAR(50) NOT NULL,
     last_name VARCHAR(50) NOT NULL,
     date_of_birth DATE,
-    gender VARCHAR(10) CHECK (gender IN ('male', 'female', 'other')),
+    gender VARCHAR(10) CHECK (gender IN ('male', 'female', 'other') OR gender IS NULL),
     phone VARCHAR(20),
     email VARCHAR(100),
     address TEXT,
@@ -433,12 +434,11 @@ CREATE INDEX IF NOT EXISTS idx_password_reset_tokens_expires_at ON password_rese
 CREATE INDEX IF NOT EXISTS idx_staff_user_id ON staff(user_id);
 CREATE INDEX IF NOT EXISTS idx_staff_role ON staff(role);
 CREATE INDEX IF NOT EXISTS idx_staff_department_id ON staff(department_id);
-CREATE INDEX IF NOT EXISTS idx_staff_is_active ON staff(is_active);
 CREATE INDEX IF NOT EXISTS idx_staff_email ON staff(email);
 
 -- Doctor indexes
-CREATE INDEX IF NOT EXISTS idx_doctors_user_id ON doctors(user_id);
 CREATE INDEX IF NOT EXISTS idx_doctors_staff_id ON doctors(staff_id);
+CREATE INDEX IF NOT EXISTS idx_doctors_user_id ON doctors(user_id);
 CREATE INDEX IF NOT EXISTS idx_doctors_specialty ON doctors(specialty);
 
 -- Patient indexes
@@ -449,7 +449,6 @@ CREATE INDEX IF NOT EXISTS idx_patients_blood_type ON patients(blood_type);
 -- Appointment indexes
 CREATE INDEX IF NOT EXISTS idx_appointments_patient_id ON appointments(patient_id);
 CREATE INDEX IF NOT EXISTS idx_appointments_doctor_id ON appointments(doctor_id);
-CREATE INDEX IF NOT EXISTS idx_appointments_created_by_user_id ON appointments(created_by_user_id);
 CREATE INDEX IF NOT EXISTS idx_appointments_date ON appointments(appointment_date);
 CREATE INDEX IF NOT EXISTS idx_appointments_status ON appointments(status);
 CREATE INDEX IF NOT EXISTS idx_appointments_datetime ON appointments(appointment_date, appointment_time);
@@ -458,7 +457,6 @@ CREATE INDEX IF NOT EXISTS idx_appointments_datetime ON appointments(appointment
 CREATE INDEX IF NOT EXISTS idx_medical_records_patient_id ON medical_records(patient_id);
 CREATE INDEX IF NOT EXISTS idx_medical_records_doctor_id ON medical_records(doctor_id);
 CREATE INDEX IF NOT EXISTS idx_medical_records_created_by_user_id ON medical_records(created_by_user_id);
-CREATE INDEX IF NOT EXISTS idx_medical_records_visit_date ON medical_records(visit_date);
 CREATE INDEX IF NOT EXISTS idx_medical_records_appointment_id ON medical_records(appointment_id);
 
 -- Medicine indexes
@@ -482,8 +480,7 @@ CREATE INDEX IF NOT EXISTS idx_prescription_items_medicine_id ON prescription_it
 CREATE INDEX IF NOT EXISTS idx_billing_patient_id ON billing(patient_id);
 CREATE INDEX IF NOT EXISTS idx_billing_processed_by_user_id ON billing(processed_by_user_id);
 CREATE INDEX IF NOT EXISTS idx_billing_status ON billing(payment_status);
-CREATE INDEX IF NOT EXISTS idx_billing_date ON billing(billing_date);
-CREATE INDEX IF NOT EXISTS idx_billing_due_date ON billing(due_date);
+CREATE INDEX IF NOT EXISTS idx_billing_payment_date ON billing(payment_date);
 
 -- Pharmacy Record indexes
 CREATE INDEX IF NOT EXISTS idx_pharmacy_records_patient_id ON pharmacy_records(patient_id);
@@ -515,7 +512,7 @@ CREATE INDEX IF NOT EXISTS idx_ambulance_log_status ON ambulance_log(status);
 
 -- Cleaning Service indexes
 CREATE INDEX IF NOT EXISTS idx_cleaning_service_room_id ON cleaning_service(room_id);
-CREATE INDEX IF NOT EXISTS idx_cleaning_service_staff_id ON cleaning_service(staff_id);
+CREATE INDEX IF NOT EXISTS idx_cleaning_service_cleaned_by ON cleaning_service(cleaned_by);
 CREATE INDEX IF NOT EXISTS idx_cleaning_service_cleaned_by_user_id ON cleaning_service(cleaned_by_user_id);
 CREATE INDEX IF NOT EXISTS idx_cleaning_service_date ON cleaning_service(cleaning_date);
 CREATE INDEX IF NOT EXISTS idx_cleaning_service_status ON cleaning_service(status);
@@ -540,7 +537,7 @@ CREATE TRIGGER update_room_assignments_updated_at BEFORE UPDATE ON room_assignme
 CREATE TRIGGER update_billing_updated_at BEFORE UPDATE ON billing FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 CREATE TRIGGER update_pharmacy_records_updated_at BEFORE UPDATE ON pharmacy_records FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 CREATE TRIGGER update_pharmacy_updated_at BEFORE UPDATE ON pharmacy FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
-CREATE TRIGGER update_ambulances_updated_at BEFORE UPDATE ON ambulances FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+CREATE TRIGGER update_ambulance_updated_at BEFORE UPDATE ON ambulance FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 CREATE TRIGGER update_ambulance_log_updated_at BEFORE UPDATE ON ambulance_log FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 CREATE TRIGGER update_cleaning_service_updated_at BEFORE UPDATE ON cleaning_service FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
@@ -562,8 +559,8 @@ COMMENT ON TABLE prescription_items IS 'Individual medicines in prescriptions';
 COMMENT ON TABLE room_assignments IS 'Room assignments for patients and staff';
 COMMENT ON TABLE billing IS 'Patient billing and payment records';
 COMMENT ON TABLE pharmacy_records IS 'Medicine dispensing records';
-COMMENT ON TABLE ambulances IS 'Ambulance fleet information';
-COMMENT ON TABLE ambulance_logs IS 'Ambulance service call logs';
+COMMENT ON TABLE ambulance IS 'Ambulance fleet information';
+COMMENT ON TABLE ambulance_log IS 'Ambulance service call logs';
 COMMENT ON TABLE cleaning_service IS 'Room cleaning and maintenance records';
 
 -- ============================================================================

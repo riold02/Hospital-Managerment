@@ -1,6 +1,7 @@
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
+import PatientAppointmentBooking from "@/components/shared/PatientAppointmentBooking"
 import {
   Heart,
   Shield,
@@ -79,6 +80,52 @@ export default function HospitalLandingPage() {
                 Cấp cứu
               </Button>
             </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Quick Appointment Booking Section */}
+      <section className="py-16 bg-background">
+        <div className="container mx-auto px-4">
+          <div className="text-center mb-12">
+            <h2 className="text-3xl lg:text-4xl font-bold text-foreground mb-4">Đặt lịch hẹn nhanh chóng</h2>
+            <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
+              Đặt lịch khám với bác sĩ chuyên khoa chỉ trong vài phút. Chúng tôi sẽ xác nhận lịch hẹn của bạn sớm nhất.
+            </p>
+          </div>
+          
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-6xl mx-auto">
+            {/* Quick Stats */}
+            <Card className="text-center">
+              <CardHeader>
+                <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <Clock className="w-6 h-6 text-blue-600" />
+                </div>
+                <CardTitle className="text-2xl font-bold text-blue-600">24/7</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-muted-foreground">Dịch vụ cấp cứu</p>
+              </CardContent>
+            </Card>
+
+            {/* Appointment Booking Card */}
+            <div className="md:col-span-1">
+              <PatientAppointmentBooking 
+                className="h-full"
+              />
+            </div>
+
+            <Card className="text-center">
+              <CardHeader>
+                <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <UserCheck className="w-6 h-6 text-green-600" />
+                </div>
+                <CardTitle className="text-2xl font-bold text-green-600">50+</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-muted-foreground">Bác sĩ chuyên khoa</p>
+              </CardContent>
+            </Card>
           </div>
         </div>
       </section>

@@ -83,7 +83,7 @@ class MedicalRecordController {
         ...(patient_id ? { patient_id: Number(patient_id) } : {}),
         ...(doctor_id ? { doctor_id: Number(doctor_id) } : {}),
         ...(date_from || date_to ? {
-          visit_date: {
+          created_at: {
             ...(date_from ? { gte: new Date(date_from) } : {}),
             ...(date_to ? { lte: new Date(date_to) } : {})
           }
@@ -123,13 +123,13 @@ class MedicalRecordController {
 
       res.json({
         success: true,
-        data,
+        data: Array.isArray(data) ? data : [],
         pagination: {
           page: parseInt(page),
           limit: parseInt(limit),
-          total: count,
-          pages: Math.ceil(count / limit),
-          hasNext: offset + parseInt(limit) < count,
+          total: count || 0,
+          pages: Math.ceil((count || 0) / limit),
+          hasNext: offset + parseInt(limit) < (count || 0),
           hasPrev: page > 1
         }
       });

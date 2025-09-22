@@ -1,3 +1,4 @@
+
 "use client"
 
 import type React from "react"
@@ -41,14 +42,22 @@ import { useAuth } from "@/lib/auth-context"
 import { apiClient, ApiError } from "@/lib/api-client"
 
 interface Appointment {
-  id: number
-  doctor: string
-  department: string
-  date: string
-  time: string
-  purpose: string
+  id?: number
+  appointment_id?: number
+  patient_id?: number | string | null
+  doctor_id?: number | string | null
+  doctor: string | { doctor_id?: number; first_name?: string; last_name?: string; specialty?: string }
+  department?: string
+  date?: string
+  time?: string
+  purpose?: string
   status: string
-  canCancel: boolean
+  canCancel?: boolean
+  appointment_date?: string
+  appointment_time?: string
+  patient?: { patient_id?: number; first_name?: string; last_name?: string }
+  created_at?: string
+  updated_at?: string
 }
 
 interface Prescription {
@@ -104,6 +113,8 @@ export default function PatientDashboard() {
   const [billing, setBilling] = useState<Bill[]>([])
   const [loading, setLoading] = useState(true)
   const [isBookingOpen, setIsBookingOpen] = useState(false)
+  const [isRescheduleOpen, setIsRescheduleOpen] = useState(false)
+  const [rescheduleAppointment, setRescheduleAppointment] = useState<Appointment | null>(null)
   const [selectedRecord, setSelectedRecord] = useState<MedicalRecord | null>(null)
   const [isRecordOpen, setIsRecordOpen] = useState(false)
   const [patientProfile, setPatientProfile] = useState<PatientProfile | null>(null)
@@ -119,22 +130,74 @@ export default function PatientDashboard() {
   const { toast } = useToast()
   const { user, logout } = useAuth()
 
+  // Helper functions to safely extract appointment data
+  const getDoctorName = (appointment: Appointment): string => {
+    if (typeof appointment.doctor === 'string') {
+      return appointment.doctor
+    }
+    if (appointment.doctor && typeof appointment.doctor === 'object') {
+      const { first_name = '', last_name = '' } = appointment.doctor
+      return `${first_name} ${last_name}`.trim() || 'Chưa xác định'
+    }
+    return 'Chưa xác định'
+  }
+
+  const getDepartmentName = (appointment: Appointment): string => {
+    if (appointment.department) return appointment.department
+    if (appointment.doctor && typeof appointment.doctor === 'object' && appointment.doctor.specialty) {
+      return appointment.doctor.specialty
+    }
+    return 'Chưa xác định'
+  }
+
+  const getAppointmentDate = (appointment: Appointment): string => {
+    if (appointment.date) return appointment.date
+    if (appointment.appointment_date) {
+      return new Date(appointment.appointment_date).toLocaleDateString('vi-VN')
+    }
+    return 'Chưa xác định'
+  }
+
+  const getAppointmentTime = (appointment: Appointment): string => {
+    if (appointment.time) return appointment.time
+    if (appointment.appointment_time) return appointment.appointment_time
+    return 'Chưa xác định'
+  }
+
+  const getAppointmentId = (appointment: Appointment): number => {
+    return appointment.id || appointment.appointment_id || 0
+  }
+
+  const getPatientId = (appointment: Appointment): string => {
+    if (appointment.patient_id !== null && appointment.patient_id !== undefined) {
+      return String(appointment.patient_id)
+    }
+    if (appointment.patient?.patient_id) {
+      return String(appointment.patient.patient_id)
+    }
+    return '0'
+  }
+
+  const getDoctorId = (appointment: Appointment): string => {
+    if (appointment.doctor_id !== null && appointment.doctor_id !== undefined) {
+      return String(appointment.doctor_id)
+    }
+    if (appointment.doctor && typeof appointment.doctor === 'object' && appointment.doctor.doctor_id) {
+      return String(appointment.doctor.doctor_id)
+    }
+    return '0'
+  }
+
   useEffect(() => {
     const fetchData = async () => {
       setLoading(true)
       try {
-        console.log("[v0] Loading patient dashboard data from API")
-        console.log("[v0] Current user:", user)
-        console.log("[v0] Auth token:", localStorage.getItem('auth_token'))
-        console.log("[v0] User role:", localStorage.getItem('user_role'))
-
         // Check if user is authenticated
         if (!user) {
           console.error("[v0] No user found, redirecting to login")
           // Don't show error for demo users, give auth context time to load
           const token = localStorage.getItem('auth_token')
           if (token && token.startsWith('demo_')) {
-            console.log("[v0] Demo token found, waiting for auth context...")
             setLoading(false)
             return
           }
@@ -172,33 +235,56 @@ export default function PatientDashboard() {
           })
         }
 
-        // Fetch other data (optional - don't block if failed)
+        // Fetch patient's appointments specifically
         try {
-          const appointmentsData = await apiClient.getAppointments()
-          setAppointments(appointmentsData)
+          const appointmentsData = await apiClient.getPatientAppointments()
+          console.log("[v0] Raw Patient appointments data:", appointmentsData)
+          
+          // Debug each appointment structure
+          if (Array.isArray(appointmentsData) && appointmentsData.length > 0) {
+            console.log("[v0] First appointment structure:", JSON.stringify(appointmentsData[0], null, 2))
+            appointmentsData.forEach((apt, index) => {
+              console.log(`[v0] Appointment ${index}:`, {
+                id: apt.id || apt.appointment_id,
+                patient_id: apt.patient_id,
+                doctor_id: apt.doctor_id,
+                doctor: apt.doctor,
+                date: apt.date || apt.appointment_date,
+                time: apt.time || apt.appointment_time,
+                purpose: apt.purpose,
+                status: apt.status
+              })
+            })
+          }
+          
+          setAppointments(Array.isArray(appointmentsData) ? appointmentsData : [])
         } catch (error) {
-          console.error("[v0] Error fetching appointments:", error)
+          console.error("[v0] Error fetching patient appointments:", error)
+          setAppointments([])
         }
 
         try {
-          const prescriptionsData = await apiClient.get("/prescriptions?patient_id=current")
-          setPrescriptions(prescriptionsData)
+          const prescriptionsData = await apiClient.get("/prescriptions")
+          setPrescriptions(Array.isArray(prescriptionsData) ? prescriptionsData : [])
         } catch (error) {
           console.error("[v0] Error fetching prescriptions:", error)
+          setPrescriptions([])
         }
 
         try {
           const medicalData = await apiClient.getMedicalRecords()
-          setMedicalHistory(medicalData)
+          setMedicalHistory(Array.isArray(medicalData) ? medicalData : [])
         } catch (error) {
           console.error("[v0] Error fetching medical records:", error)
+          setMedicalHistory([])
         }
 
         try {
           const billingData = await apiClient.getBilling()
-          setBilling(billingData)
+          setBilling(Array.isArray(billingData) ? billingData : [])
         } catch (error) {
           console.error("[v0] Error fetching billing:", error)
+          setBilling([])
         }
       } catch (error) {
         console.error("[v0] Error fetching patient data:", error)
@@ -228,46 +314,59 @@ export default function PatientDashboard() {
     }
   }, [toast, user])
 
-  // KPI calculations
-  const upcomingAppointments = appointments.filter(
-    (apt) => new Date(apt.date) >= new Date() && apt.status !== "Đã hủy",
-  ).length
+  // KPI calculations - ensure arrays exist
+  const upcomingAppointments = Array.isArray(appointments) ? appointments.filter(
+    (apt) => {
+      const appointmentDate = apt.date || apt.appointment_date
+      return appointmentDate && new Date(appointmentDate) >= new Date() && apt.status !== "Đã hủy"
+    }
+  ).length : 0
 
-  const unpaidBills = billing.filter((bill) => bill.status === "Chưa thanh toán").length
+  const unpaidBills = Array.isArray(billing) ? billing.filter((bill) => bill.status === "Chưa thanh toán").length : 0
 
   const handleBookAppointment = async (formData: any) => {
     try {
-      console.log("[v0] Booking new appointment:", formData)
-
-      const newAppointment = await apiClient.createAppointment({
-        doctor_name: formData.doctor,
-        department: formData.department,
-        appointment_date: formData.date,
-        appointment_time: formData.time,
+      const appointmentData = {
+        doctor_id: Number(formData.doctor_id),
+        appointment_date: formData.appointment_date,
+        appointment_time: formData.appointment_time,
         purpose: formData.purpose,
-        status: "Chờ xác nhận",
-      })
+        status: 'scheduled'
+      }
 
-      setAppointments([...appointments, newAppointment])
+      const newAppointment = await apiClient.createAppointment(appointmentData)
+      
+      // Convert backend response to frontend format
+      const formattedAppointment = {
+        id: newAppointment.appointment_id,
+        doctor: `${newAppointment.doctor?.first_name || ''} ${newAppointment.doctor?.last_name || ''}`.trim(),
+        department: newAppointment.doctor?.specialty || 'N/A',
+        date: new Date(newAppointment.appointment_date).toISOString().split('T')[0],
+        time: newAppointment.appointment_time,
+        purpose: newAppointment.purpose || '',
+        status: 'Chờ xác nhận',
+        canCancel: true
+      }
+
+      setAppointments([...appointments, formattedAppointment])
       setIsBookingOpen(false)
       toast({
         title: "Đặt lịch thành công",
-        description: "Lịch hẹn của bạn đã được gửi và đang chờ xác nhận.",
+        description: "Lịch hẹn của bạn đã được tạo và đang chờ xác nhận.",
       })
-    } catch (error) {
+    } catch (error: any) {
       console.error("[v0] Error booking appointment:", error)
       toast({
         title: "Lỗi",
-        description: "Không thể đặt lịch hẹn. Vui lòng thử lại.",
+        description: error.message || "Không thể đặt lịch hẹn. Vui lòng thử lại.",
         variant: "destructive",
       })
+      throw error // Re-throw to handle in form
     }
   }
 
   const handleCancelAppointment = async (id: number) => {
     try {
-      console.log("[v0] Cancelling appointment:", id)
-
       await apiClient.updateAppointmentStatus(id.toString(), "Đã hủy")
 
       setAppointments(appointments.map((apt) => (apt.id === id ? { ...apt, status: "Đã hủy", canCancel: false } : apt)))
@@ -287,8 +386,6 @@ export default function PatientDashboard() {
 
   const handleRescheduleAppointment = async (id: number, newDate: string, newTime: string) => {
     try {
-      console.log("[v0] Rescheduling appointment:", id, newDate, newTime)
-
       await apiClient.updateAppointment(id.toString(), {
         appointment_date: newDate,
         appointment_time: newTime,
@@ -733,40 +830,47 @@ export default function PatientDashboard() {
                 </div>
               </CardHeader>
               <CardContent>
-                <div className="space-y-4">
-                  {appointments.map((appointment) => (
-                    <Card key={appointment.id}>
+                  <div className="space-y-4">
+                    {Array.isArray(appointments) && appointments.length > 0 ? appointments.map((appointment) => (
+                    <Card key={getAppointmentId(appointment)}>
                       <CardContent className="p-4">
                         <div className="flex justify-between items-start">
                           <div className="space-y-2">
                             <div className="flex items-center gap-2">
-                              <h4 className="font-semibold">{appointment.doctor}</h4>
-                              <Badge variant="outline">{appointment.department}</Badge>
+                              <h4 className="font-semibold">{getDoctorName(appointment)}</h4>
+                              <Badge variant="outline">{getDepartmentName(appointment)}</Badge>
                             </div>
                             <div className="flex items-center gap-4 text-sm text-gray-600">
                               <span className="flex items-center gap-1">
                                 <Calendar className="h-4 w-4" />
-                                {appointment.date}
+                                {getAppointmentDate(appointment)}
                               </span>
                               <span className="flex items-center gap-1">
                                 <Clock className="h-4 w-4" />
-                                {appointment.time}
+                                {getAppointmentTime(appointment)}
                               </span>
                             </div>
-                            <p className="text-sm">{appointment.purpose}</p>
-                            <Badge className={getStatusColor(appointment.status)}>{appointment.status}</Badge>
+                            <p className="text-sm">{String(appointment.purpose || 'Chưa có mô tả')}</p>
+                            <Badge className={getStatusColor(appointment.status)}>{String(appointment.status || 'Chưa xác định')}</Badge>
                           </div>
                           <div className="flex gap-2">
                             {appointment.canCancel && appointment.status !== "Đã hủy" && (
                               <>
-                                <Button variant="outline" size="sm">
+                                <Button 
+                                  variant="outline" 
+                                  size="sm"
+                                  onClick={() => {
+                                    setRescheduleAppointment(appointment)
+                                    setIsRescheduleOpen(true)
+                                  }}
+                                >
                                   <Edit className="h-4 w-4 mr-1" />
                                   Đổi lịch
                                 </Button>
                                 <Button
                                   variant="outline"
                                   size="sm"
-                                  onClick={() => handleCancelAppointment(appointment.id)}
+                                  onClick={() => handleCancelAppointment(getAppointmentId(appointment))}
                                 >
                                   <X className="h-4 w-4 mr-1" />
                                   Hủy
@@ -777,10 +881,41 @@ export default function PatientDashboard() {
                         </div>
                       </CardContent>
                     </Card>
-                  ))}
+                  )) : (
+                    <div className="text-center py-8 text-gray-500">
+                      <Calendar className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                      <p>Chưa có lịch hẹn nào</p>
+                    </div>
+                  )}
                 </div>
               </CardContent>
             </Card>
+          )}
+
+          {/* Reschedule Dialog */}
+          {rescheduleAppointment && (
+            <Dialog open={isRescheduleOpen} onOpenChange={setIsRescheduleOpen}>
+              <DialogContent className="sm:max-w-md">
+                <DialogHeader>
+                  <DialogTitle>Đổi lịch hẹn</DialogTitle>
+                  <DialogDescription>
+                    Đổi lịch hẹn với {rescheduleAppointment.doctor}
+                  </DialogDescription>
+                </DialogHeader>
+                <RescheduleForm 
+                  appointment={rescheduleAppointment}
+                  onSubmit={async (newDate, newTime) => {
+                    await handleRescheduleAppointment(rescheduleAppointment.id, newDate, newTime)
+                    setIsRescheduleOpen(false)
+                    setRescheduleAppointment(null)
+                  }}
+                  onCancel={() => {
+                    setIsRescheduleOpen(false)
+                    setRescheduleAppointment(null)
+                  }}
+                />
+              </DialogContent>
+            </Dialog>
           )}
 
           {activeTab === "prescriptions" && (
@@ -966,94 +1101,418 @@ export default function PatientDashboard() {
 // Booking Form Component
 function BookingForm({ onSubmit }: { onSubmit: (data: any) => void }) {
   const [formData, setFormData] = useState({
-    doctor: "",
-    department: "",
-    date: "",
-    time: "",
+    doctor_id: "",
+    department_id: "",
+    appointment_date: "",
+    appointment_time: "",
     purpose: "",
   })
+  const [doctors, setDoctors] = useState<any[]>([])
+  const [departments, setDepartments] = useState<any[]>([])
+  const [loading, setLoading] = useState(false)
+  const [errors, setErrors] = useState<{[key: string]: string}>({})
+  const { toast } = useToast()
 
-  const handleSubmit = (e: React.FormEvent) => {
+  // Load departments and doctors on mount
+  useEffect(() => {
+    const loadData = async () => {
+      try {
+        // Try to load from API first
+        const [departmentsData, doctorsData] = await Promise.all([
+          apiClient.getDepartments().catch(err => {
+            console.error("Error loading departments:", err)
+            return []
+          }),
+          apiClient.getDoctors().catch(err => {
+            console.error("Error loading doctors:", err) 
+            return []
+          })
+        ])
+        
+        // Use fallback data if API fails
+        const fallbackDepartments = [
+          { department_id: 1, department_name: "Khoa Nội" },
+          { department_id: 2, department_name: "Khoa Ngoại" },
+          { department_id: 3, department_name: "Khoa Tim mạch" },
+          { department_id: 4, department_name: "Khoa Sản Phụ khoa" },
+          { department_id: 5, department_name: "Khoa Nhi" }
+        ]
+        
+        const fallbackDoctors = [
+          { doctor_id: 1, first_name: "BS. Nguyễn", last_name: "Văn Hùng", specialty: "Nội Tổng hợp", department_id: 1 },
+          { doctor_id: 2, first_name: "BS. Trần", last_name: "Minh Tuấn", specialty: "Phẫu thuật Tổng hợp", department_id: 2 },
+          { doctor_id: 3, first_name: "BS. Lê", last_name: "Văn Cương", specialty: "Tim mạch", department_id: 3 },
+          { doctor_id: 4, first_name: "BS. Phạm", last_name: "Thị Dung", specialty: "Sản khoa", department_id: 4 },
+          { doctor_id: 5, first_name: "BS. Hoàng", last_name: "Văn Em", specialty: "Nhi khoa", department_id: 5 }
+        ]
+        
+        setDepartments(departmentsData.length > 0 ? departmentsData : fallbackDepartments)
+        setDoctors(doctorsData.length > 0 ? doctorsData : fallbackDoctors)
+        
+      } catch (error) {
+        console.error("Error loading form data:", error)
+        
+        // Use fallback data on error
+        const fallbackDepartments = [
+          { department_id: 1, department_name: "Khoa Nội" },
+          { department_id: 2, department_name: "Khoa Ngoại" },
+          { department_id: 3, department_name: "Khoa Tim mạch" },
+          { department_id: 4, department_name: "Khoa Sản Phụ khoa" }
+        ]
+        
+        const fallbackDoctors = [
+          { doctor_id: 1, first_name: "BS. Nguyễn", last_name: "Văn Hùng", specialty: "Nội Tổng hợp", department_id: 1 },
+          { doctor_id: 2, first_name: "BS. Trần", last_name: "Minh Tuấn", specialty: "Phẫu thuật Tổng hợp", department_id: 2 },
+          { doctor_id: 3, first_name: "BS. Lê", last_name: "Văn Cương", specialty: "Tim mạch", department_id: 3 },
+          { doctor_id: 4, first_name: "BS. Phạm", last_name: "Thị Dung", specialty: "Sản khoa", department_id: 4 }
+        ]
+        
+        setDepartments(fallbackDepartments)
+        setDoctors(fallbackDoctors)
+        
+        toast({
+          title: "Thông báo",
+          description: "Đang sử dụng dữ liệu mẫu. Một số chức năng có thể bị hạn chế.",
+          variant: "default",
+        })
+      }
+    }
+    loadData()
+  }, [toast])
+
+  // Reload doctors when department changes
+  useEffect(() => {
+    const loadDoctorsByDepartment = async () => {
+      if (formData.department_id) {
+        try {
+          const doctorsData = await apiClient.getDoctors(undefined, formData.department_id)
+          setDoctors(doctorsData)
+        } catch (error) {
+          console.error("Error loading doctors by department:", error)
+          // Keep existing doctors if filtering fails
+        }
+      } else {
+        // If no department selected, load all doctors
+        try {
+          const doctorsData = await apiClient.getDoctors()
+          setDoctors(doctorsData)
+        } catch (error) {
+          console.error("Error loading all doctors:", error)
+        }
+      }
+    }
+    
+    // Only call API if we have departments data 
+    if (departments.length > 0) {
+      loadDoctorsByDepartment()
+    }
+  }, [formData.department_id, departments])
+
+  // Filter doctors by selected department (client-side fallback)
+  const filteredDoctors = formData.department_id 
+    ? doctors.filter(doctor => {
+        // Handle both API structure (doctor_department relation) and fallback structure (department_id)
+        if (doctor.doctor_department && Array.isArray(doctor.doctor_department)) {
+          return doctor.doctor_department.some(dept => dept.department_id?.toString() === formData.department_id)
+        }
+        return doctor.department_id?.toString() === formData.department_id
+      })
+    : doctors
+
+  const validateForm = () => {
+    const newErrors: {[key: string]: string} = {}
+    
+    if (!formData.doctor_id) newErrors.doctor_id = "Vui lòng chọn bác sĩ"
+    if (!formData.appointment_date) newErrors.appointment_date = "Vui lòng chọn ngày hẹn"
+    if (!formData.appointment_time) newErrors.appointment_time = "Vui lòng chọn giờ hẹn"
+    if (!formData.purpose || formData.purpose.length < 10) {
+      newErrors.purpose = "Mục đích khám phải có ít nhất 10 ký tự"
+    }
+
+    // Check if appointment date is not in the past
+    const appointmentDate = new Date(formData.appointment_date)
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    
+    if (appointmentDate < today) {
+      newErrors.appointment_date = "Không thể đặt lịch hẹn trong quá khứ"
+    }
+
+    // Check if it's weekend
+    const dayOfWeek = appointmentDate.getDay()
+    if (dayOfWeek === 0 || dayOfWeek === 6) {
+      newErrors.appointment_date = "Không thể đặt lịch hẹn vào cuối tuần"
+    }
+
+    setErrors(newErrors)
+    return Object.keys(newErrors).length === 0
+  }
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    onSubmit(formData)
-    setFormData({
-      doctor: "",
-      department: "",
-      date: "",
-      time: "",
-      purpose: "",
-    })
+    
+    if (!validateForm()) return
+
+    setLoading(true)
+    try {
+      await onSubmit(formData)
+      setFormData({
+        doctor_id: "",
+        department_id: "",
+        appointment_date: "",
+        appointment_time: "",
+        purpose: "",
+      })
+      setErrors({})
+    } catch (error) {
+      console.error("Error submitting form:", error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const generateTimeSlots = () => {
+    const slots = []
+    // Morning slots: 8:00 - 11:30
+    for (let i = 8; i <= 11; i++) {
+      slots.push(`${i.toString().padStart(2, '0')}:00`)
+      if (i < 11) slots.push(`${i.toString().padStart(2, '0')}:30`)
+    }
+    // Afternoon slots: 14:00 - 17:30
+    for (let i = 14; i <= 17; i++) {
+      slots.push(`${i.toString().padStart(2, '0')}:00`)
+      if (i < 17) slots.push(`${i.toString().padStart(2, '0')}:30`)
+    }
+    return slots
   }
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       <div>
         <Label htmlFor="department">Khoa</Label>
-        <Select value={formData.department} onValueChange={(value) => setFormData({ ...formData, department: value })}>
+        <Select 
+          value={formData.department_id} 
+          onValueChange={(value) => setFormData({ ...formData, department_id: value, doctor_id: "" })}
+        >
           <SelectTrigger>
-            <SelectValue placeholder="Chọn khoa" />
+            <SelectValue placeholder="Chọn khoa (không bắt buộc)" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="tim-mach">Tim mạch</SelectItem>
-            <SelectItem value="da-lieu">Da liễu</SelectItem>
-            <SelectItem value="noi-khoa">Nội khoa</SelectItem>
-            <SelectItem value="ngoai-khoa">Ngoại khoa</SelectItem>
+            {departments.map((dept) => (
+              <SelectItem key={dept.department_id} value={dept.department_id.toString()}>
+                {dept.department_name}
+              </SelectItem>
+            ))}
           </SelectContent>
         </Select>
+        {errors.department_id && <p className="text-sm text-red-500 mt-1">{errors.department_id}</p>}
       </div>
 
       <div>
-        <Label htmlFor="doctor">Bác sĩ</Label>
-        <Select value={formData.doctor} onValueChange={(value) => setFormData({ ...formData, doctor: value })}>
+        <Label htmlFor="doctor">Bác sĩ *</Label>
+        <Select 
+          value={formData.doctor_id} 
+          onValueChange={(value) => setFormData({ ...formData, doctor_id: value })}
+        >
           <SelectTrigger>
             <SelectValue placeholder="Chọn bác sĩ" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="BS. Nguyễn Văn A">BS. Nguyễn Văn A</SelectItem>
-            <SelectItem value="BS. Trần Thị B">BS. Trần Thị B</SelectItem>
-            <SelectItem value="BS. Lê Văn C">BS. Lê Văn C</SelectItem>
+            {filteredDoctors.map((doctor) => (
+              <SelectItem key={doctor.doctor_id} value={doctor.doctor_id.toString()}>
+                {doctor.first_name} {doctor.last_name} - {doctor.specialty}
+              </SelectItem>
+            ))}
           </SelectContent>
         </Select>
+        {errors.doctor_id && <p className="text-sm text-red-500 mt-1">{errors.doctor_id}</p>}
+      </div>
+
+      <div className="grid grid-cols-2 gap-4">
+        <div>
+          <Label htmlFor="date">Ngày hẹn *</Label>
+          <Input
+            type="date"
+            value={formData.appointment_date}
+            onChange={(e) => setFormData({ ...formData, appointment_date: e.target.value })}
+            min={new Date().toISOString().split("T")[0]}
+          />
+          {errors.appointment_date && <p className="text-sm text-red-500 mt-1">{errors.appointment_date}</p>}
+        </div>
+        
+        <div>
+          <Label htmlFor="time">Giờ hẹn *</Label>
+          <Select 
+            value={formData.appointment_time} 
+            onValueChange={(value) => setFormData({ ...formData, appointment_time: value })}
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="Chọn giờ" />
+            </SelectTrigger>
+            <SelectContent>
+              {generateTimeSlots().map((time) => (
+                <SelectItem key={time} value={time}>
+                  {time}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          {errors.appointment_time && <p className="text-sm text-red-500 mt-1">{errors.appointment_time}</p>}
+        </div>
       </div>
 
       <div>
-        <Label htmlFor="date">Ngày hẹn</Label>
-        <Input
-          type="date"
-          value={formData.date}
-          onChange={(e) => setFormData({ ...formData, date: e.target.value })}
-          min={new Date().toISOString().split("T")[0]}
-        />
-      </div>
-
-      <div>
-        <Label htmlFor="time">Giờ hẹn</Label>
-        <Select value={formData.time} onValueChange={(value) => setFormData({ ...formData, time: value })}>
-          <SelectTrigger>
-            <SelectValue placeholder="Chọn giờ" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="08:00">08:00</SelectItem>
-            <SelectItem value="09:00">09:00</SelectItem>
-            <SelectItem value="10:00">10:00</SelectItem>
-            <SelectItem value="14:00">14:00</SelectItem>
-            <SelectItem value="15:00">15:00</SelectItem>
-            <SelectItem value="16:00">16:00</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
-
-      <div>
-        <Label htmlFor="purpose">Mục đích khám</Label>
+        <Label htmlFor="purpose">Mục đích khám *</Label>
         <Textarea
           value={formData.purpose}
           onChange={(e) => setFormData({ ...formData, purpose: e.target.value })}
-          placeholder="Mô tả lý do khám bệnh..."
+          placeholder="Mô tả triệu chứng hoặc lý do khám bệnh (ít nhất 10 ký tự)..."
+          rows={3}
+          minLength={10}
+          maxLength={500}
         />
+        <div className="text-xs text-muted-foreground mt-1">
+          {formData.purpose.length}/500 ký tự (tối thiểu 10 ký tự)
+        </div>
+        {errors.purpose && <p className="text-sm text-red-500 mt-1">{errors.purpose}</p>}
       </div>
 
       <DialogFooter>
-        <Button type="submit">Đặt lịch hẹn</Button>
+        <Button type="submit" disabled={loading}>
+          {loading ? "Đang đặt lịch..." : "Đặt lịch hẹn"}
+        </Button>
+      </DialogFooter>
+    </form>
+  )
+}
+
+// Reschedule Form Component
+function RescheduleForm({ 
+  appointment, 
+  onSubmit, 
+  onCancel 
+}: { 
+  appointment: Appointment
+  onSubmit: (newDate: string, newTime: string) => Promise<void>
+  onCancel: () => void
+}) {
+  const [newDate, setNewDate] = useState(appointment.date)
+  const [newTime, setNewTime] = useState(appointment.time)
+  const [loading, setLoading] = useState(false)
+  const [errors, setErrors] = useState<{[key: string]: string}>({})
+
+  const generateTimeSlots = () => {
+    const slots = []
+    // Morning slots: 8:00 - 11:30
+    for (let i = 8; i <= 11; i++) {
+      slots.push(`${i.toString().padStart(2, '0')}:00`)
+      if (i < 11) slots.push(`${i.toString().padStart(2, '0')}:30`)
+    }
+    // Afternoon slots: 14:00 - 17:30
+    for (let i = 14; i <= 17; i++) {
+      slots.push(`${i.toString().padStart(2, '0')}:00`)
+      if (i < 17) slots.push(`${i.toString().padStart(2, '0')}:30`)
+    }
+    return slots
+  }
+
+  const validateForm = () => {
+    const newErrors: {[key: string]: string} = {}
+    
+    if (!newDate) newErrors.date = "Vui lòng chọn ngày mới"
+    if (!newTime) newErrors.time = "Vui lòng chọn giờ mới"
+
+    // Check if appointment date is not in the past
+    const appointmentDate = new Date(newDate)
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    
+    if (appointmentDate < today) {
+      newErrors.date = "Không thể đặt lịch hẹn trong quá khứ"
+    }
+
+    // Check if it's weekend
+    const dayOfWeek = appointmentDate.getDay()
+    if (dayOfWeek === 0 || dayOfWeek === 6) {
+      newErrors.date = "Không thể đặt lịch hẹn vào cuối tuần"
+    }
+
+    // Check if new date/time is different from current
+    if (newDate === appointment.date && newTime === appointment.time) {
+      newErrors.general = "Vui lòng chọn ngày hoặc giờ khác với lịch hẹn hiện tại"
+    }
+
+    setErrors(newErrors)
+    return Object.keys(newErrors).length === 0
+  }
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    
+    if (!validateForm()) return
+
+    setLoading(true)
+    try {
+      await onSubmit(newDate, newTime)
+    } catch (error) {
+      console.error("Error rescheduling appointment:", error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-4">
+      {errors.general && (
+        <div className="text-sm text-red-500 bg-red-50 p-3 rounded">
+          {errors.general}
+        </div>
+      )}
+      
+      <div className="bg-gray-50 p-3 rounded">
+        <h4 className="font-medium text-sm mb-2">Lịch hẹn hiện tại:</h4>
+        <p className="text-sm text-gray-600">
+          {appointment.date} lúc {appointment.time}
+        </p>
+      </div>
+
+      <div className="grid grid-cols-2 gap-4">
+        <div>
+          <Label htmlFor="newDate">Ngày mới *</Label>
+          <Input
+            type="date"
+            value={newDate}
+            onChange={(e) => setNewDate(e.target.value)}
+            min={new Date().toISOString().split("T")[0]}
+          />
+          {errors.date && <p className="text-sm text-red-500 mt-1">{errors.date}</p>}
+        </div>
+        
+        <div>
+          <Label htmlFor="newTime">Giờ mới *</Label>
+          <Select value={newTime} onValueChange={setNewTime}>
+            <SelectTrigger>
+              <SelectValue placeholder="Chọn giờ mới" />
+            </SelectTrigger>
+            <SelectContent>
+              {generateTimeSlots().map((time) => (
+                <SelectItem key={time} value={time}>
+                  {time}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          {errors.time && <p className="text-sm text-red-500 mt-1">{errors.time}</p>}
+        </div>
+      </div>
+
+      <DialogFooter>
+        <Button type="button" variant="outline" onClick={onCancel} disabled={loading}>
+          Hủy
+        </Button>
+        <Button type="submit" disabled={loading}>
+          {loading ? "Đang cập nhật..." : "Đổi lịch"}
+        </Button>
       </DialogFooter>
     </form>
   )

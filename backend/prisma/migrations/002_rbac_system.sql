@@ -53,16 +53,6 @@ CREATE TABLE IF NOT EXISTS role_permissions (
     UNIQUE(role_id, permission_id)
 );
 
--- Password Reset Tokens
-CREATE TABLE IF NOT EXISTS password_reset_tokens (
-    token_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    user_id UUID NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
-    token_hash VARCHAR(255) NOT NULL,
-    expires_at TIMESTAMPTZ NOT NULL,
-    used_at TIMESTAMPTZ NULL,
-    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
-);
-
 -- ============================================================================
 -- NOTE: USER_ID INTEGRATION
 -- ============================================================================
@@ -92,11 +82,6 @@ CREATE INDEX IF NOT EXISTS idx_role_permissions_permission_id ON role_permission
 -- Permissions indexes
 CREATE INDEX IF NOT EXISTS idx_permissions_resource ON permissions(resource);
 CREATE INDEX IF NOT EXISTS idx_permissions_action ON permissions(action);
-
--- Password reset tokens indexes
-CREATE INDEX IF NOT EXISTS idx_password_reset_tokens_token_hash ON password_reset_tokens(token_hash);
-CREATE INDEX IF NOT EXISTS idx_password_reset_tokens_user_id ON password_reset_tokens(user_id);
-CREATE INDEX IF NOT EXISTS idx_password_reset_tokens_expires_at ON password_reset_tokens(expires_at);
 
 -- ============================================================================
 -- RBAC TRIGGERS AND FUNCTIONS
@@ -275,20 +260,6 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
--- Function to clean up expired tokens (should be run periodically)
-CREATE OR REPLACE FUNCTION cleanup_expired_reset_tokens()
-RETURNS INTEGER AS $$
-DECLARE
-    deleted_count INTEGER;
-BEGIN
-    DELETE FROM password_reset_tokens 
-    WHERE expires_at < NOW() OR used_at IS NOT NULL;
-    
-    GET DIAGNOSTICS deleted_count = ROW_COUNT;
-    RETURN deleted_count;
-END;
-$$ LANGUAGE plpgsql;
-
 -- ============================================================================
 -- APPLY TRIGGERS
 -- ============================================================================
@@ -341,9 +312,9 @@ CREATE TRIGGER trigger_sync_prescription_user_id
     EXECUTE FUNCTION sync_prescription_user_id();
 
 -- Ambulance triggers
-DROP TRIGGER IF EXISTS trigger_sync_ambulance_driver_user_id ON ambulances;
+DROP TRIGGER IF EXISTS trigger_sync_ambulance_driver_user_id ON ambulance;
 CREATE TRIGGER trigger_sync_ambulance_driver_user_id
-    BEFORE INSERT OR UPDATE ON ambulances
+    BEFORE INSERT OR UPDATE ON ambulance
     FOR EACH ROW
     EXECUTE FUNCTION sync_ambulance_driver_user_id();
 
@@ -555,7 +526,7 @@ SELECT
     -- Room assignments made
     COUNT(DISTINCT ra.assignment_id) as room_assignments_made,
     -- Cleaning services performed
-    COUNT(DISTINCT cs.service_id) as cleaning_services_performed
+    COUNT(DISTINCT cs.cleaning_id) as cleaning_services_performed
 FROM users u
 LEFT JOIN medical_records mr ON u.user_id = mr.created_by_user_id
 LEFT JOIN prescriptions pr ON u.user_id = pr.prescribed_by_user_id

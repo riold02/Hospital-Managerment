@@ -17,7 +17,7 @@ model patients {
   first_name              String    @db.VarChar(50)
   last_name               String    @db.VarChar(50)
   date_of_birth           DateTime? @db.Date
-  gender                  String?   @db.VarChar(10)
+  gender                  String?   @db.VarChar(10) // CHECK constraint: ('male', 'female', 'other')
   phone                   String?   @db.VarChar(20)
   email                   String?   @db.VarChar(100)
   address                 String?

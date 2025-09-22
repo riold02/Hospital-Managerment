@@ -280,6 +280,7 @@ const validateDoctor = [
 // Appointment validation rules
 const validateAppointment = [
   body('patient_id')
+    .optional()
     .isInt({ min: 1 })
     .withMessage('Valid patient ID is required'),
   
@@ -299,22 +300,45 @@ const validateAppointment = [
         throw new Error('Appointment date cannot be in the past');
       }
       
+      // Don't allow appointments more than 3 months in advance
+      const maxDate = new Date();
+      maxDate.setMonth(maxDate.getMonth() + 3);
+      if (appointmentDate > maxDate) {
+        throw new Error('Appointment cannot be scheduled more than 3 months in advance');
+      }
+      
       return true;
     }),
   
   body('appointment_time')
     .matches(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/)
-    .withMessage('Valid appointment time is required (HH:MM format)'),
+    .withMessage('Valid appointment time is required (HH:MM format)')
+    .custom((value) => {
+      const [hours, minutes] = value.split(':').map(Number);
+      
+      // Only allow appointments during business hours
+      if (hours < 8 || hours > 17 || (hours === 17 && minutes > 0)) {
+        throw new Error('Appointments are only available between 8:00 AM and 5:00 PM');
+      }
+      
+      // Only allow appointments at 30-minute intervals
+      if (minutes !== 0 && minutes !== 30) {
+        throw new Error('Appointments must be scheduled at 30-minute intervals (e.g., 9:00, 9:30)');
+      }
+      
+      return true;
+    }),
   
   body('purpose')
-    .optional()
-    .isLength({ max: 500 })
-    .withMessage('Purpose must not exceed 500 characters')
+    .notEmpty()
+    .withMessage('Purpose is required')
+    .isLength({ min: 10, max: 500 })
+    .withMessage('Purpose must be between 10 and 500 characters')
     .trim(),
   
   body('status')
     .optional()
-    .isIn(['SCHEDULED', 'CONFIRMED', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED', 'NO_SHOW'])
+    .isIn(['scheduled', 'confirmed', 'in_progress', 'completed', 'cancelled', 'no_show'])
     .withMessage('Invalid appointment status')
 ];
 

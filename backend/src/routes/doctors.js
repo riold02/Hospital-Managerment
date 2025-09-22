@@ -6,6 +6,48 @@ const { authenticateToken, requireStaff, requireAdmin } = require('../middleware
 
 /**
  * @swagger
+ * /api/v1/doctors:
+ *   get:
+ *     summary: Get all doctors
+ *     tags: [Doctors]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *           default: 1
+ *         description: Page number
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           default: 20
+ *         description: Number of items per page
+ *       - in: query
+ *         name: search
+ *         schema:
+ *           type: string
+ *         description: Search by name or specialty
+ *       - in: query
+ *         name: specialty
+ *         schema:
+ *           type: string
+ *         description: Filter by specialty
+ *       - in: query
+ *         name: department_id
+ *         schema:
+ *           type: integer
+ *         description: Filter by department ID
+ *     responses:
+ *       200:
+ *         description: List of doctors
+ */
+router.get('/', doctorController.getAllDoctors);
+
+/**
+ * @swagger
  * components:
  *   schemas:
  *     Doctor:
@@ -103,7 +145,6 @@ const { authenticateToken, requireStaff, requireAdmin } = require('../middleware
  *                 pagination:
  *                   type: object
  */
-router.get('/', doctorController.getAllDoctors);
 
 /**
  * @swagger

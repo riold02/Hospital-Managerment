@@ -16,11 +16,12 @@ class BillingController {
 
       const billingData = {
         patient_id: Number(req.body.patient_id),
-        billing_date: req.body.billing_date ? new Date(req.body.billing_date) : new Date(),
+        appointment_id: req.body.appointment_id ? Number(req.body.appointment_id) : null,
+        processed_by_user_id: req.user?.user_id || null,
         total_amount: parseFloat(req.body.total_amount),
         payment_status: req.body.payment_status || 'Pending',
         payment_date: req.body.payment_date ? new Date(req.body.payment_date) : null,
-        description: req.body.description || null
+        insurance_provider: req.body.insurance_provider || null
       };
 
       const data = await prisma.billing.create({
@@ -62,22 +63,27 @@ class BillingController {
         payment_status,
         date_from,
         date_to,
-        sortBy = 'billing_date', 
+        sortBy = 'created_at', 
         sortOrder = 'desc' 
       } = req.query;
       
       const offset = (page - 1) * limit;
 
-      const where = {
+      let where = {
         ...(patient_id ? { patient_id: Number(patient_id) } : {}),
         ...(payment_status ? { payment_status } : {}),
         ...(date_from || date_to ? {
-          billing_date: {
+          created_at: {
             ...(date_from ? { gte: new Date(date_from) } : {}),
             ...(date_to ? { lte: new Date(date_to) } : {})
           }
         } : {})
       };
+
+      // If user is a patient, filter by their patient_id
+      if (req.user && req.user.role === 'patient' && req.user.patient_id) {
+        where.patient_id = req.user.patient_id;
+      }
 
       const [data, count] = await Promise.all([
         prisma.billing.findMany({
@@ -96,19 +102,25 @@ class BillingController {
           orderBy: { [sortBy]: sortOrder === 'asc' ? 'asc' : 'desc' },
           skip: Number(offset),
           take: Number(limit)
+        }).catch(error => {
+          console.error('Billing query error:', error);
+          return [];
         }),
-        prisma.billing.count({ where })
+        prisma.billing.count({ where }).catch(error => {
+          console.error('Billing count error:', error);
+          return 0;
+        })
       ]);
 
       res.json({
         success: true,
-        data,
+        data: Array.isArray(data) ? data : [],
         pagination: {
           page: parseInt(page),
           limit: parseInt(limit),
-          total: count,
-          pages: Math.ceil(count / limit),
-          hasNext: offset + parseInt(limit) < count,
+          total: count || 0,
+          pages: Math.ceil((count || 0) / limit),
+          hasNext: offset + parseInt(limit) < (count || 0),
           hasPrev: page > 1
         }
       });
@@ -177,11 +189,12 @@ class BillingController {
       const { id } = req.params;
       const updateData = {
         patient_id: req.body.patient_id ? Number(req.body.patient_id) : undefined,
-        billing_date: req.body.billing_date ? new Date(req.body.billing_date) : undefined,
+        appointment_id: req.body.appointment_id ? Number(req.body.appointment_id) : undefined,
+        processed_by_user_id: req.body.processed_by_user_id || undefined,
         total_amount: req.body.total_amount ? parseFloat(req.body.total_amount) : undefined,
         payment_status: req.body.payment_status,
         payment_date: req.body.payment_date ? new Date(req.body.payment_date) : undefined,
-        description: req.body.description
+        insurance_provider: req.body.insurance_provider
       };
 
       // Remove undefined values
@@ -251,7 +264,7 @@ class BillingController {
 
       const where = {
         ...(date_from || date_to ? {
-          billing_date: {
+          created_at: {
             ...(date_from ? { gte: new Date(date_from) } : {}),
             ...(date_to ? { lte: new Date(date_to) } : {})
           }
@@ -310,7 +323,7 @@ class BillingController {
 
       const data = await prisma.billing.findMany({
         where: { patient_id: Number(patient_id) },
-        orderBy: { billing_date: 'desc' }
+        orderBy: { created_at: 'desc' }
       });
 
       res.json({

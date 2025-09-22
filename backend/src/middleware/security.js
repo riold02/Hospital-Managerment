@@ -201,11 +201,15 @@ const createRateLimiter = (options = {}) => {
 // Different rate limits for different endpoints
 const authRateLimit = createRateLimiter({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 10, // Stricter limit for auth endpoints
+  max: 100, // More lenient limit for development
   message: {
     success: false,
     error: 'Too many authentication attempts. Please try again later.',
     retryAfter: 900
+  },
+  skip: (req) => {
+    // Skip rate limiting for /auth/me endpoint during development
+    return req.path === '/auth/me' || req.path.includes('/auth/patient/profile');
   }
 });
 

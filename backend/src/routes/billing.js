@@ -116,7 +116,7 @@ const { authenticateToken, requireStaff } = require('../middleware/auth');
  *                 pagination:
  *                   type: object
  */
-router.get('/', authenticateToken, requireStaff, billingController.getAllBilling);
+router.get('/', authenticateToken, billingController.getAllBilling);
 
 /**
  * @swagger

@@ -81,7 +81,7 @@ class PrescriptionController {
       
       const offset = (page - 1) * limit;
 
-      const where = {
+      let where = {
         ...(patient_id ? { patient_id: Number(patient_id) } : {}),
         ...(prescribed_by ? { prescribed_by: Number(prescribed_by) } : {}),
         ...(status ? { status } : {}),
@@ -92,6 +92,11 @@ class PrescriptionController {
           }
         } : {})
       };
+
+      // If user is a patient, filter by their patient_id
+      if (req.user && req.user.role === 'patient' && req.user.patient_id) {
+        where.patient_id = req.user.patient_id;
+      }
 
       const [data, count] = await Promise.all([
         prisma.prescriptions.findMany({
@@ -124,13 +129,13 @@ class PrescriptionController {
 
       res.json({
         success: true,
-        data,
+        data: Array.isArray(data) ? data : [],
         pagination: {
           page: parseInt(page),
           limit: parseInt(limit),
-          total: count,
-          pages: Math.ceil(count / limit),
-          hasNext: offset + parseInt(limit) < count,
+          total: count || 0,
+          pages: Math.ceil((count || 0) / limit),
+          hasNext: offset + parseInt(limit) < (count || 0),
           hasPrev: page > 1
         }
       });

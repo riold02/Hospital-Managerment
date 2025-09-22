@@ -134,11 +134,19 @@ class ApiClient {
   // Appointments
   async getAppointments(date?: string): Promise<any[]> {
     const params = date ? `?date=${date}` : ""
-    return this.get(`/appointments${params}`)
+    const response = await this.get<{success: boolean, data: any[]}>(`/appointments${params}`)
+    return response.data || []
+  }
+
+  async getPatientAppointments(patientId?: string): Promise<any[]> {
+    const endpoint = patientId ? `/appointments/patient/${patientId}` : "/appointments/patient/me"
+    const response = await this.get<{success: boolean, data: any[]}>(endpoint)
+    return response.data || []
   }
 
   async createAppointment(data: any): Promise<any> {
-    return this.post("/appointments", data)
+    const response = await this.post<{success: boolean, data: any, message?: string}>("/appointments", data)
+    return response.data
   }
 
   async updateAppointment(id: string, data: any): Promise<any> {
@@ -201,8 +209,19 @@ class ApiClient {
     return this.post("/auth/register/staff", data)
   }
 
-  async getDoctors(): Promise<any[]> {
-    return this.get("/doctors")
+  async getDoctors(specialty?: string, department_id?: string): Promise<any[]> {
+    const params = new URLSearchParams()
+    if (specialty) params.append('specialty', specialty)
+    if (department_id) params.append('department_id', department_id)
+    const queryString = params.toString()
+    
+    const response = await this.get<{success: boolean, data: any[]}>(`/doctors${queryString ? '?' + queryString : ''}`)
+    return response.data || []
+  }
+
+  async getDepartments(): Promise<any[]> {
+    const response = await this.get<{success: boolean, data: any[]}>("/departments")
+    return response.data || []
   }
 
   async getNurses(): Promise<any[]> {

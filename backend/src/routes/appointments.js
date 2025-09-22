@@ -204,6 +204,27 @@ router.get('/doctor/:doctor_id', authenticateToken, appointmentController.getDoc
 
 /**
  * @swagger
+ * /api/v1/appointments/patient/me:
+ *   get:
+ *     summary: Get current patient's appointments
+ *     tags: [Appointments]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: status
+ *         schema:
+ *           type: string
+ *           enum: [SCHEDULED, CONFIRMED, IN_PROGRESS, COMPLETED, CANCELLED, NO_SHOW]
+ *         description: Filter by status
+ *     responses:
+ *       200:
+ *         description: Current patient's appointments
+ */
+router.get('/patient/me', authenticateToken, appointmentController.getCurrentPatientAppointments);
+
+/**
+ * @swagger
  * /api/v1/appointments/patient/{patient_id}:
  *   get:
  *     summary: Get patient's appointments

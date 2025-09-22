@@ -255,18 +255,16 @@ ON CONFLICT (role_id, permission_id) DO NOTHING;
 -- ============================================================================
 
 -- Insert admin user
-INSERT INTO users (user_id, email, password_hash, is_active, is_verified)
+INSERT INTO users (user_id, email, password_hash, is_active)
 VALUES (
     'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11'::UUID,
     'admin@hospital.com',
     '$2b$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', -- password: admin123
-    true,
     true
 )
 ON CONFLICT (email) DO UPDATE SET
     password_hash = EXCLUDED.password_hash,
     is_active = EXCLUDED.is_active,
-    is_verified = EXCLUDED.is_verified,
     updated_at = CURRENT_TIMESTAMP;
 
 -- Assign admin role to admin user
@@ -285,7 +283,6 @@ ON CONFLICT (user_id, role_id) DO UPDATE SET
 -- Create admin staff record
 INSERT INTO staff (
     staff_id,
-    employee_id,
     first_name,
     last_name,
     email,
@@ -293,12 +290,9 @@ INSERT INTO staff (
     role,
     position,
     hire_date,
-    salary,
-    is_active,
     user_id
 ) VALUES (
     1,
-    'ADM001',
     'System',
     'Administrator',
     'admin@hospital.com',
@@ -306,59 +300,102 @@ INSERT INTO staff (
     'admin',
     'System Administrator',
     CURRENT_DATE,
-    100000.00,
-    true,
     'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11'::UUID
 )
-ON CONFLICT (employee_id) DO UPDATE SET
+ON CONFLICT (staff_id) DO UPDATE SET
     first_name = EXCLUDED.first_name,
     last_name = EXCLUDED.last_name,
     email = EXCLUDED.email,
     phone = EXCLUDED.phone,
     role = EXCLUDED.role,
     position = EXCLUDED.position,
-    is_active = EXCLUDED.is_active,
     user_id = EXCLUDED.user_id,
     updated_at = CURRENT_TIMESTAMP;
 
 -- ============================================================================
--- CREATE DEMO USERS FOR TESTING
+-- CREATE DEMO USERS FOR TESTING (from demo-accounts.ts)
+-- Password: Demo1234 -> $2b$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi
 -- ============================================================================
 
--- Demo Doctor
-INSERT INTO users (user_id, email, password_hash, is_active, is_verified) VALUES
-('b1eebc99-9c0b-4ef8-bb6d-6bb9bd380a11'::UUID, 'doctor@hospital.com', '$2b$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', true, true)
+-- Demo Admin
+INSERT INTO users (user_id, email, password_hash, is_active) VALUES
+('d0000001-0000-0000-0000-000000000001'::UUID, 'admin@demo.com', '$2b$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', true)
 ON CONFLICT (email) DO NOTHING;
 
 INSERT INTO user_roles (user_id, role_id)
-SELECT 'b1eebc99-9c0b-4ef8-bb6d-6bb9bd380a11'::UUID, role_id FROM roles WHERE role_name = 'doctor'
+SELECT 'd0000001-0000-0000-0000-000000000001'::UUID, role_id FROM roles WHERE role_name = 'admin'
+ON CONFLICT (user_id, role_id) DO NOTHING;
+
+-- Demo Doctor
+INSERT INTO users (user_id, email, password_hash, is_active) VALUES
+('d0000002-0000-0000-0000-000000000001'::UUID, 'doctor@demo.com', '$2b$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', true)
+ON CONFLICT (email) DO NOTHING;
+
+INSERT INTO user_roles (user_id, role_id)
+SELECT 'd0000002-0000-0000-0000-000000000001'::UUID, role_id FROM roles WHERE role_name = 'doctor'
 ON CONFLICT (user_id, role_id) DO NOTHING;
 
 -- Demo Nurse
-INSERT INTO users (user_id, email, password_hash, is_active, is_verified) VALUES
-('c1eebc99-9c0b-4ef8-bb6d-6bb9bd380a11'::UUID, 'nurse@hospital.com', '$2b$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', true, true)
+INSERT INTO users (user_id, email, password_hash, is_active) VALUES
+('d0000003-0000-0000-0000-000000000001'::UUID, 'nurse@demo.com', '$2b$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', true)
 ON CONFLICT (email) DO NOTHING;
 
 INSERT INTO user_roles (user_id, role_id)
-SELECT 'c1eebc99-9c0b-4ef8-bb6d-6bb9bd380a11'::UUID, role_id FROM roles WHERE role_name = 'nurse'
-ON CONFLICT (user_id, role_id) DO NOTHING;
-
--- Demo Pharmacist
-INSERT INTO users (user_id, email, password_hash, is_active, is_verified) VALUES
-('d1eebc99-9c0b-4ef8-bb6d-6bb9bd380a11'::UUID, 'pharmacist@hospital.com', '$2b$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', true, true)
-ON CONFLICT (email) DO NOTHING;
-
-INSERT INTO user_roles (user_id, role_id)
-SELECT 'd1eebc99-9c0b-4ef8-bb6d-6bb9bd380a11'::UUID, role_id FROM roles WHERE role_name = 'pharmacist'
+SELECT 'd0000003-0000-0000-0000-000000000001'::UUID, role_id FROM roles WHERE role_name = 'nurse'
 ON CONFLICT (user_id, role_id) DO NOTHING;
 
 -- Demo Patient
-INSERT INTO users (user_id, email, password_hash, is_active, is_verified) VALUES
-('e1eebc99-9c0b-4ef8-bb6d-6bb9bd380a11'::UUID, 'patient@hospital.com', '$2b$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', true, true)
+INSERT INTO users (user_id, email, password_hash, is_active) VALUES
+('d0000004-0000-0000-0000-000000000001'::UUID, 'patient@demo.com', '$2b$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', true)
 ON CONFLICT (email) DO NOTHING;
 
 INSERT INTO user_roles (user_id, role_id)
-SELECT 'e1eebc99-9c0b-4ef8-bb6d-6bb9bd380a11'::UUID, role_id FROM roles WHERE role_name = 'patient'
+SELECT 'd0000004-0000-0000-0000-000000000001'::UUID, role_id FROM roles WHERE role_name = 'patient'
+ON CONFLICT (user_id, role_id) DO NOTHING;
+
+-- Demo Pharmacist
+INSERT INTO users (user_id, email, password_hash, is_active) VALUES
+('d0000005-0000-0000-0000-000000000001'::UUID, 'pharmacist@demo.com', '$2b$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', true)
+ON CONFLICT (email) DO NOTHING;
+
+INSERT INTO user_roles (user_id, role_id)
+SELECT 'd0000005-0000-0000-0000-000000000001'::UUID, role_id FROM roles WHERE role_name = 'pharmacist'
+ON CONFLICT (user_id, role_id) DO NOTHING;
+
+-- Demo Technician
+INSERT INTO users (user_id, email, password_hash, is_active) VALUES
+('d0000006-0000-0000-0000-000000000001'::UUID, 'technician@demo.com', '$2b$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', true)
+ON CONFLICT (email) DO NOTHING;
+
+INSERT INTO user_roles (user_id, role_id)
+SELECT 'd0000006-0000-0000-0000-000000000001'::UUID, role_id FROM roles WHERE role_name = 'technician'
+ON CONFLICT (user_id, role_id) DO NOTHING;
+
+-- Demo Lab Assistant (using technician role)
+INSERT INTO users (user_id, email, password_hash, is_active) VALUES
+('d0000007-0000-0000-0000-000000000001'::UUID, 'lab@demo.com', '$2b$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', true)
+ON CONFLICT (email) DO NOTHING;
+
+INSERT INTO user_roles (user_id, role_id)
+SELECT 'd0000007-0000-0000-0000-000000000001'::UUID, role_id FROM roles WHERE role_name = 'technician'
+ON CONFLICT (user_id, role_id) DO NOTHING;
+
+-- Demo Driver
+INSERT INTO users (user_id, email, password_hash, is_active) VALUES
+('d0000008-0000-0000-0000-000000000001'::UUID, 'driver@demo.com', '$2b$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', true)
+ON CONFLICT (email) DO NOTHING;
+
+INSERT INTO user_roles (user_id, role_id)
+SELECT 'd0000008-0000-0000-0000-000000000001'::UUID, role_id FROM roles WHERE role_name = 'driver'
+ON CONFLICT (user_id, role_id) DO NOTHING;
+
+-- Demo Worker
+INSERT INTO users (user_id, email, password_hash, is_active) VALUES
+('d0000009-0000-0000-0000-000000000001'::UUID, 'worker@demo.com', '$2b$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', true)
+ON CONFLICT (email) DO NOTHING;
+
+INSERT INTO user_roles (user_id, role_id)
+SELECT 'd0000009-0000-0000-0000-000000000001'::UUID, role_id FROM roles WHERE role_name = 'worker'
 ON CONFLICT (user_id, role_id) DO NOTHING;
 
 -- ============================================================================
@@ -459,10 +496,10 @@ INSERT INTO users (user_id, email, password_hash, is_active, created_at) VALUES
 ('d1005003-0000-0000-0000-000000000016', 'bs.phanvank@hospital.vn', '$2a$12$KVOdu7Cgn4.s8nsDTv1R5.53svG2t2RCsk4HCThJsErURrwmanvz6', true, NOW()),
 
 -- Nurses and staff
-('n1001001-0000-0000-0000-000000000017', 'yta.nguyenthil@hospital.vn', '$2a$12$KVOdu7Cgn4.s8nsDTv1R5.53svG2t2RCsk4HCThJsErURrwmanvz6', true, NOW()),
-('n1001002-0000-0000-0000-000000000018', 'yta.tranvanm@hospital.vn', '$2a$12$KVOdu7Cgn4.s8nsDTv1R5.53svG2t2RCsk4HCThJsErURrwmanvz6', true, NOW()),
+('61001001-0000-0000-0000-000000000017', 'yta.nguyenthil@hospital.vn', '$2a$12$KVOdu7Cgn4.s8nsDTv1R5.53svG2t2RCsk4HCThJsErURrwmanvz6', true, NOW()),
+('61001002-0000-0000-0000-000000000018', 'yta.tranvanm@hospital.vn', '$2a$12$KVOdu7Cgn4.s8nsDTv1R5.53svG2t2RCsk4HCThJsErURrwmanvz6', true, NOW()),
 ('a1001001-0000-0000-0000-000000000019', 'admin.system@hospital.vn', '$2a$12$KVOdu7Cgn4.s8nsDTv1R5.53svG2t2RCsk4HCThJsErURrwmanvz6', true, NOW()),
-('p1001001-0000-0000-0000-000000000020', 'duocsi.nguyenn@hospital.vn', '$2a$12$KVOdu7Cgn4.s8nsDTv1R5.53svG2t2RCsk4HCThJsErURrwmanvz6', true, NOW())
+('71001001-0000-0000-0000-000000000020', 'duocsi.nguyenn@hospital.vn', '$2a$12$KVOdu7Cgn4.s8nsDTv1R5.53svG2t2RCsk4HCThJsErURrwmanvz6', true, NOW())
 ON CONFLICT (email) DO NOTHING;
 
 -- Doctors
@@ -514,10 +551,10 @@ ON CONFLICT DO NOTHING;
 
 -- Staff (Non-doctor personnel)
 INSERT INTO staff (user_id, first_name, last_name, role, position, department_id, phone, email, hire_date, created_at) VALUES
-('n1001001-0000-0000-0000-000000000017', 'Y tá. Nguyễn Thị', 'Lan', 'nurse', 'Y tá trưởng khoa Nội', 1, '0987654321', 'yta.nguyenthil@hospital.vn', '2023-01-15', NOW()),
-('n1001002-0000-0000-0000-000000000018', 'Y tá. Trần Văn', 'Minh', 'nurse', 'Y tá khoa Ngoại', 2, '0987654322', 'yta.tranvanm@hospital.vn', '2023-02-01', NOW()),
+('61001001-0000-0000-0000-000000000017', 'Y tá. Nguyễn Thị', 'Lan', 'nurse', 'Y tá trưởng khoa Nội', 1, '0987654321', 'yta.nguyenthil@hospital.vn', '2023-01-15', NOW()),
+('61001002-0000-0000-0000-000000000018', 'Y tá. Trần Văn', 'Minh', 'nurse', 'Y tá khoa Ngoại', 2, '0987654322', 'yta.tranvanm@hospital.vn', '2023-02-01', NOW()),
 ('a1001001-0000-0000-0000-000000000019', 'Admin. Lê Thị', 'Oanh', 'admin', 'Quản trị hệ thống', NULL, '0987654323', 'admin.system@hospital.vn', '2022-12-01', NOW()),
-('p1001001-0000-0000-0000-000000000020', 'Dược sĩ. Nguyễn Văn', 'Nam', 'pharmacist', 'Dược sĩ trưởng', 10, '0987654324', 'duocsi.nguyenn@hospital.vn', '2023-03-01', NOW())
+('71001001-0000-0000-0000-000000000020', 'Dược sĩ. Nguyễn Văn', 'Nam', 'pharmacist', 'Dược sĩ trưởng', 10, '0987654324', 'duocsi.nguyenn@hospital.vn', '2023-03-01', NOW())
 ON CONFLICT DO NOTHING;
 
 -- User Roles mapping for medical staff
@@ -541,14 +578,14 @@ INSERT INTO user_roles (user_id, role_id, is_active) VALUES
 ('d1005003-0000-0000-0000-000000000016', 2, true),
 
 -- Nurses get nurse role (role_id = 3)
-('n1001001-0000-0000-0000-000000000017', 3, true),
-('n1001002-0000-0000-0000-000000000018', 3, true),
+('61001001-0000-0000-0000-000000000017', 3, true),
+('61001002-0000-0000-0000-000000000018', 3, true),
 
 -- Admin gets admin role (role_id = 1)
 ('a1001001-0000-0000-0000-000000000019', 1, true),
 
 -- Pharmacist gets pharmacist role (role_id = 4)
-('p1001001-0000-0000-0000-000000000020', 4, true)
+('71001001-0000-0000-0000-000000000020', 4, true)
 ON CONFLICT (user_id, role_id) DO NOTHING;
 
 -- ============================================================================
@@ -573,12 +610,12 @@ ON CONFLICT DO NOTHING;
 -- ============================================================================
 
 -- Create some sample patients with user accounts
-INSERT INTO users (user_id, email, password_hash, is_active, is_verified) VALUES
-('p0000001-0000-0000-0000-000000000001', 'patient1@email.com', '$2a$12$KVOdu7Cgn4.s8nsDTv1R5.53svG2t2RCsk4HCThJsErURrwmanvz6', true, true),
-('p0000002-0000-0000-0000-000000000002', 'patient2@email.com', '$2a$12$KVOdu7Cgn4.s8nsDTv1R5.53svG2t2RCsk4HCThJsErURrwmanvz6', true, true),
-('p0000003-0000-0000-0000-000000000003', 'patient3@email.com', '$2a$12$KVOdu7Cgn4.s8nsDTv1R5.53svG2t2RCsk4HCThJsErURrwmanvz6', true, true),
-('p0000004-0000-0000-0000-000000000004', 'patient4@email.com', '$2a$12$KVOdu7Cgn4.s8nsDTv1R5.53svG2t2RCsk4HCThJsErURrwmanvz6', true, true),
-('p0000005-0000-0000-0000-000000000005', 'patient5@email.com', '$2a$12$KVOdu7Cgn4.s8nsDTv1R5.53svG2t2RCsk4HCThJsErURrwmanvz6', true, true)
+INSERT INTO users (user_id, email, password_hash, is_active) VALUES
+('e0000001-0000-0000-0000-000000000001', 'patient1@email.com', '$2a$12$KVOdu7Cgn4.s8nsDTv1R5.53svG2t2RCsk4HCThJsErURrwmanvz6', true),
+('e0000002-0000-0000-0000-000000000002', 'patient2@email.com', '$2a$12$KVOdu7Cgn4.s8nsDTv1R5.53svG2t2RCsk4HCThJsErURrwmanvz6', true),
+('e0000003-0000-0000-0000-000000000003', 'patient3@email.com', '$2a$12$KVOdu7Cgn4.s8nsDTv1R5.53svG2t2RCsk4HCThJsErURrwmanvz6', true),
+('e0000004-0000-0000-0000-000000000004', 'patient4@email.com', '$2a$12$KVOdu7Cgn4.s8nsDTv1R5.53svG2t2RCsk4HCThJsErURrwmanvz6', true),
+('e0000005-0000-0000-0000-000000000005', 'patient5@email.com', '$2a$12$KVOdu7Cgn4.s8nsDTv1R5.53svG2t2RCsk4HCThJsErURrwmanvz6', true)
 ON CONFLICT (email) DO NOTHING;
 
 -- Assign patient role to sample patients
@@ -586,47 +623,47 @@ INSERT INTO user_roles (user_id, role_id, is_active)
 SELECT user_id, (SELECT role_id FROM roles WHERE role_name = 'patient'), true
 FROM users 
 WHERE user_id IN (
-    'p0000001-0000-0000-0000-000000000001',
-    'p0000002-0000-0000-0000-000000000002',
-    'p0000003-0000-0000-0000-000000000003',
-    'p0000004-0000-0000-0000-000000000004',
-    'p0000005-0000-0000-0000-000000000005'
+    'e0000001-0000-0000-0000-000000000001',
+    'e0000002-0000-0000-0000-000000000002',
+    'e0000003-0000-0000-0000-000000000003',
+    'e0000004-0000-0000-0000-000000000004',
+    'e0000005-0000-0000-0000-000000000005'
 )
 ON CONFLICT (user_id, role_id) DO NOTHING;
 
 -- Sample patients
 INSERT INTO patients (patient_code, user_id, first_name, last_name, date_of_birth, gender, phone, email, address, blood_type, created_at) VALUES
-('BN001', 'p0000001-0000-0000-0000-000000000001', 'Nguyễn Văn', 'A', '1980-05-15', 'male', '0912345001', 'patient1@email.com', '123 Đường ABC, Quận 1, TP.HCM', 'O+', NOW()),
-('BN002', 'p0000002-0000-0000-0000-000000000002', 'Trần Thị', 'B', '1975-08-22', 'female', '0912345002', 'patient2@email.com', '456 Đường DEF, Quận 2, TP.HCM', 'A+', NOW()),
-('BN003', 'p0000003-0000-0000-0000-000000000003', 'Lê Văn', 'C', '1990-12-10', 'male', '0912345003', 'patient3@email.com', '789 Đường GHI, Quận 3, TP.HCM', 'B+', NOW()),
-('BN004', 'p0000004-0000-0000-0000-000000000004', 'Phạm Thị', 'D', '1985-03-28', 'female', '0912345004', 'patient4@email.com', '321 Đường JKL, Quận 4, TP.HCM', 'AB+', NOW()),
-('BN005', 'p0000005-0000-0000-0000-000000000005', 'Hoàng Văn', 'E', '1992-07-14', 'male', '0912345005', 'patient5@email.com', '654 Đường MNO, Quận 5, TP.HCM', 'O-', NOW())
+('BN001', 'e0000001-0000-0000-0000-000000000001', 'Nguyễn Văn', 'A', '1980-05-15', 'male', '0912345001', 'patient1@email.com', '123 Đường ABC, Quận 1, TP.HCM', 'O+', NOW()),
+('BN002', 'e0000002-0000-0000-0000-000000000002', 'Trần Thị', 'B', '1975-08-22', 'female', '0912345002', 'patient2@email.com', '456 Đường DEF, Quận 2, TP.HCM', 'A+', NOW()),
+('BN003', 'e0000003-0000-0000-0000-000000000003', 'Lê Văn', 'C', '1990-12-10', 'male', '0912345003', 'patient3@email.com', '789 Đường GHI, Quận 3, TP.HCM', 'B+', NOW()),
+('BN004', 'e0000004-0000-0000-0000-000000000004', 'Phạm Thị', 'D', '1985-03-28', 'female', '0912345004', 'patient4@email.com', '321 Đường JKL, Quận 4, TP.HCM', 'AB+', NOW()),
+('BN005', 'e0000005-0000-0000-0000-000000000005', 'Hoàng Văn', 'E', '1992-07-14', 'male', '0912345005', 'patient5@email.com', '654 Đường MNO, Quận 5, TP.HCM', 'O-', NOW())
 ON CONFLICT (patient_code) DO NOTHING;
 
 -- ============================================================================
 -- SAMPLE APPOINTMENTS
 -- ============================================================================
 
-INSERT INTO appointments (patient_id, doctor_id, appointment_date, appointment_time, reason, status, created_at) VALUES
+INSERT INTO appointments (patient_id, doctor_id, appointment_date, appointment_time, purpose, status, created_at) VALUES
 -- Appointments with internal medicine doctors
-(1, 6, '2025-09-22', '08:30:00', 'Khám tổng quát định kỳ', 'scheduled', NOW()),
-(2, 7, '2025-09-22', '09:00:00', 'Đau bụng, rối loạn tiêu hóa', 'scheduled', NOW()),
-(3, 8, '2025-09-23', '10:30:00', 'Theo dõi điều trị tiểu đường', 'scheduled', NOW()),
+(1, 6, '2025-09-22', '08:30:00', 'Khám tổng quát định kỳ', 'Scheduled', NOW()),
+(2, 7, '2025-09-22', '09:00:00', 'Đau bụng, rối loạn tiêu hóa', 'Scheduled', NOW()),
+(3, 8, '2025-09-23', '10:30:00', 'Theo dõi điều trị tiểu đường', 'Scheduled', NOW()),
 
 -- Appointments with cardiology doctors
-(4, 11, '2025-09-24', '14:00:00', 'Khám tim mạch, đau ngực', 'scheduled', NOW()),
-(5, 12, '2025-09-25', '15:30:00', 'Tái khám sau phẫu thuật tim', 'scheduled', NOW()),
+(4, 11, '2025-09-24', '14:00:00', 'Khám tim mạch, đau ngực', 'Scheduled', NOW()),
+(5, 12, '2025-09-25', '15:30:00', 'Tái khám sau phẫu thuật tim', 'Scheduled', NOW()),
 
 -- Appointments with pediatrics doctors
-(1, 15, '2025-09-23', '08:00:00', 'Khám cho con (5 tuổi) - ho, sốt', 'scheduled', NOW()),
-(2, 16, '2025-09-24', '09:30:00', 'Tiêm chủng cho trẻ', 'scheduled', NOW())
+(1, 15, '2025-09-23', '08:00:00', 'Khám cho con (5 tuổi) - ho, sốt', 'Scheduled', NOW()),
+(2, 16, '2025-09-24', '09:30:00', 'Tiêm chủng cho trẻ', 'Scheduled', NOW())
 ON CONFLICT DO NOTHING;
 
 -- ============================================================================
 -- SAMPLE MEDICAL RECORDS
 -- ============================================================================
 
-INSERT INTO medical_records (patient_id, doctor_id, appointment_id, diagnosis, treatment_plan, notes, created_at) VALUES
+INSERT INTO medical_records (patient_id, doctor_id, appointment_id, diagnosis, treatment, prescription, created_at) VALUES
 (1, 6, 1, 'Tăng huyết áp độ 1', 'Chế độ ăn ít muối, tập thể dục đều đặn', 'Amlodipine 5mg x 1 viên/ngày', NOW()),
 (2, 7, 2, 'Viêm dạ dày cấp', 'Kiêng cay nóng, ăn nhẹ', 'Omeprazole 20mg x 2 lần/ngày, Domperidone 10mg x 3 lần/ngày', NOW()),
 (3, 8, 3, 'Đái tháo đường type 2', 'Điều chỉnh chế độ ăn, tập thể dục', 'Metformin 500mg x 2 lần/ngày', NOW())
