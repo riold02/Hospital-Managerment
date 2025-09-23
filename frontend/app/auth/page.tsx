@@ -86,51 +86,55 @@ export default function AuthPage() {
       setIsLoading(true)
       try {
         if (isLogin) {
-          try {
-            const response = await apiClient.login(formData.email, formData.password)
-            console.log("Login API response:", response)
-            
-            // Clear any old demo data first
-            localStorage.removeItem("user_info")
-            localStorage.removeItem("user_role")
-            
-            await login(response.token)
-            
-            // Get user role from response to redirect appropriately
-            const userRole = response.user?.role?.toLowerCase() || 'patient'
-            
-            console.log("Redirecting user with role:", userRole)
-            
-            if (userRole === 'patient') {
-              router.push("/dashboard/patient")
-            } else {
-              router.push("/dashboard")
+          // First, check if it's a demo account
+          const demoAccount = demoAccounts.find(
+            (acc) => acc.email === formData.email && acc.password === formData.password,
+          )
+
+          if (demoAccount) {
+            console.log("Using demo account:", demoAccount.role)
+            // Demo: lưu "token" giả để hợp với flow AuthProvider
+            await login("demo_token")
+
+            const roleRoutes: Record<string, string> = {
+              Admin: "/dashboard/admin",
+              Doctor: "/dashboard/doctor", 
+              Nurse: "/dashboard/nurse",
+              Patient: "/dashboard/patient",
+              Pharmacist: "/dashboard/pharmacist",
+              Technician: "/dashboard/technician",
+              "Lab Assistant": "/dashboard/lab",
+              Driver: "/dashboard/driver",
+              Worker: "/dashboard/worker",
             }
-          } catch (apiError) {
-            console.log("API authentication failed, trying demo accounts:", apiError)
 
-            const demoAccount = demoAccounts.find(
-              (acc) => acc.email === formData.email && acc.password === formData.password,
-            )
-
-            if (demoAccount) {
-              // Demo: lưa "token" giả để hợp với flow AuthProvider
-              await login("demo_token")
-
-              const roleRoutes: Record<string, string> = {
-                Admin: "/dashboard/admin",
-                Doctor: "/dashboard/doctor", 
-                Nurse: "/dashboard/nurse",
-                Patient: "/dashboard/patient",
-                Pharmacist: "/dashboard/pharmacist",
-                Technician: "/dashboard/technician",
-                "Lab Assistant": "/dashboard/lab",
-                Driver: "/dashboard/driver",
-                Worker: "/dashboard/worker",
+            router.push(roleRoutes[demoAccount.role] || "/dashboard")
+          } else {
+            // Not a demo account, try real API authentication
+            try {
+              const response = await apiClient.login(formData.email, formData.password)
+              console.log("Login API response:", response)
+              
+              // Clear any old demo data first
+              localStorage.removeItem("user_info")
+              localStorage.removeItem("user_role")
+              
+              await login(response.token)
+              
+              // Get user role from response to redirect appropriately
+              const userRole = response.user?.role?.toLowerCase() || 'patient'
+              
+              console.log("Redirecting user with role:", userRole)
+              
+              if (userRole === 'patient') {
+                router.push("/dashboard/patient")
+              } else if (userRole === 'admin') {
+                router.push("/dashboard/admin")
+              } else {
+                router.push("/dashboard")
               }
-
-              router.push(roleRoutes[demoAccount.role] || "/dashboard")
-            } else {
+            } catch (apiError) {
+              console.error("API authentication failed:", apiError)
               setErrors({ email: "Tài khoản không tồn tại hoặc mật khẩu không đúng." })
             }
           }

@@ -122,6 +122,7 @@ app.use('/api/v1/prescriptions', require('./src/routes/prescriptions'));
 app.use('/api/v1/ambulances', require('./src/routes/ambulances')); // Ambulances only
 app.use('/api/v1/ambulance-log', require('./src/routes/ambulanceLogs')); // Ambulance logs
 app.use('/api/v1/reports', require('./src/routes/reports'));
+app.use('/api/v1/dashboard', require('./src/routes/dashboard'));
 
 // Root endpoint
 app.get('/', (req, res) => {

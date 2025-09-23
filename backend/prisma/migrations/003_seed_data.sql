@@ -254,12 +254,12 @@ ON CONFLICT (role_id, permission_id) DO NOTHING;
 -- CREATE INITIAL ADMIN USER
 -- ============================================================================
 
--- Insert admin user
+-- Insert admin user (Current active admin)
 INSERT INTO users (user_id, email, password_hash, is_active)
 VALUES (
-    'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11'::UUID,
+    '0c5a4dd7-b0f9-48ab-8dc5-8fd5952f700d'::UUID,
     'admin@hospital.com',
-    '$2b$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', -- password: admin123
+    '$2a$10$LZUzkT9ikvNhXCo8fxbESeqdENZs9cL70FR5TIpCkASmW..43K96u', -- password: Demo1234
     true
 )
 ON CONFLICT (email) DO UPDATE SET
@@ -270,7 +270,7 @@ ON CONFLICT (email) DO UPDATE SET
 -- Assign admin role to admin user
 INSERT INTO user_roles (user_id, role_id, assigned_at, is_active)
 SELECT 
-    'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11'::UUID,
+    '0c5a4dd7-b0f9-48ab-8dc5-8fd5952f700d'::UUID,
     r.role_id,
     CURRENT_TIMESTAMP,
     true
@@ -293,14 +293,14 @@ INSERT INTO staff (
     user_id
 ) VALUES (
     1,
-    'System',
-    'Administrator',
+    'Admin',
+    'Hospital',
     'admin@hospital.com',
-    '+1234567890',
+    '+0987654321',
     'admin',
-    'System Administrator',
+    'Hospital Administrator',
     CURRENT_DATE,
-    'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11'::UUID
+    '0c5a4dd7-b0f9-48ab-8dc5-8fd5952f700d'::UUID
 )
 ON CONFLICT (staff_id) DO UPDATE SET
     first_name = EXCLUDED.first_name,

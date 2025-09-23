@@ -30,7 +30,6 @@ import {
   UserCog,
 } from "lucide-react"
 import Link from "next/link"
-import { apiClient, ApiError } from "@/lib/api-client"
 
 interface KPIData {
   todayAppointments: number
@@ -62,33 +61,42 @@ export default function AdminDashboard() {
   const [dateFilter, setDateFilter] = useState(new Date().toISOString().split("T")[0])
   const [searchTerm, setSearchTerm] = useState("")
 
+  // Mock data for demonstration
   useEffect(() => {
     const fetchData = async () => {
       try {
-        console.log("[v0] Loading admin dashboard data from API")
+        console.log("[v0] Loading admin dashboard data")
         setLoading(true)
-        setError(null)
 
-        // Fetch KPI data from backend
-        const kpis = await apiClient.getDashboardKPIs()
-        setKpiData(kpis)
+        // Simulate API calls
+        await new Promise((resolve) => setTimeout(resolve, 1000))
 
-        // Fetch pending billing data
-        const billing = await apiClient.getBilling("pending")
-        setBillingData(billing)
+        // Mock KPI data
+        setKpiData({
+          todayAppointments: 24,
+          roomOccupancy: 78,
+          monthlyRevenue: 2450000,
+          expiringMedicine: 12,
+        })
 
-        // Fetch unavailable rooms
-        const rooms = await apiClient.getRooms("unavailable")
-        setRoomData(rooms)
+        // Mock billing data
+        setBillingData([
+          { bill_id: "BL001", patient: "Nguyễn Văn An", amount: 850000, created_at: "2024-01-15" },
+          { bill_id: "BL002", patient: "Trần Thị Bình", amount: 1200000, created_at: "2024-01-14" },
+          { bill_id: "BL003", patient: "Lê Văn Cường", amount: 650000, created_at: "2024-01-13" },
+          { bill_id: "BL004", patient: "Phạm Thị Dung", amount: 950000, created_at: "2024-01-12" },
+        ])
+
+        // Mock room data
+        setRoomData([
+          { room_number: "P101", type: "Phòng đơn", status: "Occupied", last_serviced: "2024-01-10" },
+          { room_number: "P205", type: "Phòng ICU", status: "Under Maintenance", last_serviced: "2024-01-08" },
+          { room_number: "P312", type: "Phòng đôi", status: "Occupied", last_serviced: "2024-01-09" },
+        ])
 
         setLoading(false)
       } catch (err) {
-        console.error("[v0] Error fetching dashboard data:", err)
-        if (err instanceof ApiError) {
-          setError(`Không thể tải dữ liệu: ${err.message}`)
-        } else {
-          setError("Không thể tải dữ liệu. Vui lòng thử lại.")
-        }
+        setError("Không thể tải dữ liệu. Vui lòng thử lại.")
         setLoading(false)
       }
     }
@@ -98,23 +106,21 @@ export default function AdminDashboard() {
 
   const handleMarkPaid = async (billId: string) => {
     try {
+      // Simulate API call: PUT /billing/{id}
       console.log(`[v0] Marking bill ${billId} as paid`)
-      await apiClient.updateBillingStatus(billId, "paid")
       setBillingData((prev) => prev.filter((item) => item.bill_id !== billId))
     } catch (err) {
       console.error("Error marking bill as paid:", err)
-      setError("Không thể cập nhật trạng thái hóa đơn")
     }
   }
 
   const handleSetAvailable = async (roomNumber: string) => {
     try {
+      // Simulate API call: PUT /rooms/{id}
       console.log(`[v0] Setting room ${roomNumber} as available`)
-      await apiClient.updateRoomStatus(roomNumber, "available")
       setRoomData((prev) => prev.filter((item) => item.room_number !== roomNumber))
     } catch (err) {
       console.error("Error setting room as available:", err)
-      setError("Không thể cập nhật trạng thái phòng")
     }
   }
 
@@ -140,7 +146,7 @@ export default function AdminDashboard() {
         <div className="flex items-center justify-center min-h-[400px]">
           <div className="text-center">
             <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4" />
-            <p className="text-muted-foreground">Đang tải dữ liệu từ server...</p>
+            <p className="text-muted-foreground">Đang tải dữ liệu...</p>
           </div>
         </div>
       </DashboardLayout>
@@ -187,7 +193,7 @@ export default function AdminDashboard() {
             <Calendar className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-primary">{kpiData?.todayAppointments || 0}</div>
+            <div className="text-2xl font-bold text-primary">{kpiData?.todayAppointments}</div>
             <p className="text-xs text-muted-foreground">cuộc hẹn đã đặt</p>
           </CardContent>
         </Card>
@@ -198,7 +204,7 @@ export default function AdminDashboard() {
             <Building2 className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-primary">{kpiData?.roomOccupancy || 0}%</div>
+            <div className="text-2xl font-bold text-primary">{kpiData?.roomOccupancy}%</div>
             <p className="text-xs text-muted-foreground">phòng đang sử dụng</p>
           </CardContent>
         </Card>
@@ -209,9 +215,7 @@ export default function AdminDashboard() {
             <DollarSign className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-primary">
-              {kpiData?.monthlyRevenue?.toLocaleString("vi-VN") || 0}₫
-            </div>
+            <div className="text-2xl font-bold text-primary">{kpiData?.monthlyRevenue?.toLocaleString("vi-VN")}₫</div>
             <p className="text-xs text-muted-foreground">tháng này</p>
           </CardContent>
         </Card>
@@ -222,7 +226,7 @@ export default function AdminDashboard() {
             <AlertTriangle className="h-4 w-4 text-destructive" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-destructive">{kpiData?.expiringMedicine || 0}</div>
+            <div className="text-2xl font-bold text-destructive">{kpiData?.expiringMedicine}</div>
             <p className="text-xs text-muted-foreground">trong 30 ngày tới</p>
           </CardContent>
         </Card>
@@ -340,8 +344,8 @@ export default function AdminDashboard() {
         </Card>
       </div>
 
-      {/* Core Management */}
       <div className="space-y-8">
+        {/* Core Management */}
         <Card>
           <CardHeader>
             <CardTitle>Quản Lý Cốt Lõi</CardTitle>
