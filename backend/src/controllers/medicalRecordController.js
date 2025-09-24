@@ -17,7 +17,7 @@ class MedicalRecordController {
       const medicalRecordData = {
                                                                                                                                              patient_id: Number(req.body.patient_id),
         doctor_id: Number(req.body.doctor_id),
-        visit_date: req.body.visit_date ? new Date(req.body.visit_date) : new Date(),
+        // visit_date is not in schema, using created_at instead
         diagnosis: req.body.diagnosis,
         treatment: req.body.treatment || null,
         symptoms: req.body.symptoms || null,
@@ -73,7 +73,7 @@ class MedicalRecordController {
         date_from,
         date_to,
         diagnosis,
-        sortBy = 'visit_date', 
+        sortBy = 'created_at', 
         sortOrder = 'desc' 
       } = req.query;
       
@@ -212,7 +212,7 @@ class MedicalRecordController {
       const updateData = {
         patient_id: req.body.patient_id ? Number(req.body.patient_id) : undefined,
         doctor_id: req.body.doctor_id ? Number(req.body.doctor_id) : undefined,
-        visit_date: req.body.visit_date ? new Date(req.body.visit_date) : undefined,
+        // visit_date is not in schema, removed
         diagnosis: req.body.diagnosis,
         treatment: req.body.treatment,
         symptoms: req.body.symptoms,

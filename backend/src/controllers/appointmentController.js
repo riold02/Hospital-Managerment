@@ -7,27 +7,50 @@ class AppointmentController {
     try {
       const errors = validationResult(req);
       if (!errors.isEmpty()) {
+        console.log('Validation errors:', JSON.stringify(errors.array(), null, 2));
         return res.status(400).json({
           success: false,
-                   first_name: true,
-              last_name: true,
-              phone: true,  error: 'Validation failed',
+          error: 'Validation failed',
           details: errors.array()
         });
       }
 
-      // console.log('Raw request body:', req.body);
+      console.log('Raw request body:', req.body);
+      console.log('User from token:', req.user);
+      
+      // Get patient_id from JWT token for security
+      const patient_id = req.user.patient_id || req.user.id;
+      
+      if (!patient_id) {
+        return res.status(400).json({
+          success: false,
+          error: 'Patient ID not found in token'
+        });
+      }
+      
+      // Chuyển đổi time string (HH:MM) thành DateTime object cho PostgreSQL
+      const timeString = req.body.appointment_time; // "17:00"
+      const [hours, minutes] = timeString.split(':');
+      
+      // Tạo DateTime object với ngày hôm nay và time specified
+      const appointmentTime = new Date();
+      appointmentTime.setHours(parseInt(hours), parseInt(minutes), 0, 0);
+      
+      console.log('Time conversion:', { 
+        original: timeString, 
+        converted: appointmentTime.toISOString() 
+      });
       
       const appointmentData = {
-        patient_id: Number(req.body.patient_id),
+        patient_id: Number(patient_id),
         doctor_id: req.body.doctor_id ? Number(req.body.doctor_id) : null,
         appointment_date: new Date(req.body.appointment_date),
-        appointment_time: req.body.appointment_time, // Keep as string to match schema
+        appointment_time: appointmentTime, // DateTime object cho PostgreSQL Time
         purpose: req.body.purpose || null,
         status: req.body.status || 'Scheduled'
       };
       
-      // console.log('Processed appointment data:', appointmentData);
+      console.log('Processed appointment data:', appointmentData);
 
       // Skip conflict check temporarily due to UTF-8 database issues
       

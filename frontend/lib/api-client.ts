@@ -86,6 +86,13 @@ class ApiClient {
     return this.request<T>(endpoint, { method: "DELETE" })
   }
 
+  async patch<T>(endpoint: string, data?: any): Promise<T> {
+    return this.request<T>(endpoint, {
+      method: "PATCH",
+      ...(data && { body: JSON.stringify(data) })
+    })
+  }
+
   // Dashboard KPIs
   async getDashboardKPIs(): Promise<{
     todayAppointments: number
@@ -155,6 +162,10 @@ class ApiClient {
 
   async updateAppointmentStatus(id: string, status: string): Promise<any> {
     return this.put(`/appointments/${id}/status`, { status })
+  }
+
+  async cancelAppointment(id: string): Promise<any> {
+    return this.patch(`/appointments/${id}/cancel`)
   }
 
   // Billing

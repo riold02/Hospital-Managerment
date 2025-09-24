@@ -33,7 +33,7 @@ class BillingController {
               first_name: true,
               last_name: true,
               email: true,
-              contact_number: true
+              phone: true
             }
           }
         }
@@ -95,7 +95,7 @@ class BillingController {
                 first_name: true,
                 last_name: true,
                 email: true,
-                contact_number: true
+                phone: true
               }
             }
           },
@@ -147,7 +147,7 @@ class BillingController {
               first_name: true,
               last_name: true,
               email: true,
-              contact_number: true,
+              phone: true,
               address: true
             }
           }
@@ -215,7 +215,7 @@ class BillingController {
               first_name: true,
               last_name: true,
               email: true,
-              contact_number: true
+              phone: true
             }
           }
         }

@@ -1,8 +1,8 @@
-import Link from "next/link"
+"use client"
+
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import PatientAppointmentBooking from "@/components/shared/PatientAppointmentBooking"
 import {
   Heart,
   Shield,
@@ -18,8 +18,25 @@ import {
   Calendar,
   ArrowRight,
 } from "lucide-react"
+import { useEffect, useState } from "react"
 
 export default function HospitalLandingPage() {
+  const [currentSlide, setCurrentSlide] = useState(0)
+
+  const heroImages = [
+    "/kafeel.png",
+    "/medical-team-of-doctors-and-nurses-in-hospital-cor.jpg",
+    "/advanced-medical-equipment-in-hospital-room.jpg",
+  ]
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentSlide((prev) => (prev + 1) % heroImages.length)
+    }, 4000) // Change slide every 4 seconds
+
+    return () => clearInterval(timer)
+  }, [heroImages.length])
+
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
@@ -50,99 +67,78 @@ export default function HospitalLandingPage() {
           </nav>
           <div className="flex items-center gap-3">
             <Button variant="outline" asChild>
-              <Link href="/auth">Đăng nhập</Link>
+              <a href="/auth">Đăng nhập</a>
             </Button>
-            <Button asChild>
-              <Link href="/auth">Đặt lịch khám</Link>
-            </Button>
+            <Button>Đặt lịch khám</Button>
           </div>
         </div>
       </header>
 
       {/* Hero Section */}
       <section className="relative py-20 lg:py-32 overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-accent/5"></div>
-        <div className="container mx-auto px-4 relative">
+        <div className="absolute inset-0">
+          <div className="relative w-full h-full">
+            {heroImages.map((image, index) => (
+              <div
+                key={index}
+                className={`absolute inset-0 transition-opacity duration-1000 ${
+                  index === currentSlide ? "opacity-60" : "opacity-0"
+                }`}
+              >
+                <img
+                  src={image || "/placeholder.svg"}
+                  alt={`Hospital slide ${index + 1}`}
+                  className="w-full h-full object-cover"
+                />
+              </div>
+            ))}
+          </div>
+          <div className="absolute inset-0 bg-gradient-to-br from-background/40 via-background/20 to-background/40"></div>
+        </div>
+
+        <div className="container mx-auto px-4 relative z-10">
           <div className="max-w-4xl mx-auto text-center">
-            <Badge variant="secondary" className="mb-6">
+            <Badge
+              variant="secondary"
+              className="mb-6 bg-white text-primary font-semibold px-4 py-2 shadow-lg border border-white/20"
+            >
               <Shield className="w-4 h-4 mr-2" />
               Dịch vụ Y tế Tin cậy từ năm 1985
             </Badge>
-            <h1 className="text-4xl lg:text-6xl font-bold text-foreground mb-6 leading-tight">
+            <h1 className="text-4xl lg:text-6xl font-bold text-black mb-6 leading-tight">
               Sức khỏe của bạn, <span className="text-primary">Ưu tiên</span> của chúng tôi
             </h1>
-            <p className="text-xl text-muted-foreground mb-8 max-w-2xl mx-auto leading-relaxed">
-              Trải nghiệm dịch vụ y tế đẳng cấp thế giới với đội ngũ chuyên gia tận tâm. Từ khám sức khỏe định kỳ đến
-              điều trị chuyên khoa, chúng tôi luôn sẵn sàng phục vụ bạn 24/7.
-            </p>
+            <div className="bg-white/30 backdrop-blur-sm rounded-lg p-6 mb-8 max-w-2xl mx-auto border border-white/20">
+              <p className="text-xl text-gray-800 leading-relaxed font-medium">
+                Trải nghiệm dịch vụ y tế đẳng cấp thế giới với đội ngũ chuyên gia tận tâm. Từ khám sức khỏe định kỳ đến
+                điều trị chuyên khoa, chúng tôi luôn sẵn sàng phục vụ bạn 24/7.
+              </p>
+            </div>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <Button size="lg" className="text-lg px-8" asChild>
-                <Link href="/auth">Đặt lịch khám</Link>
+              <Button size="lg" className="text-lg px-8 shadow-lg">
+                Đặt lịch khám
               </Button>
-              <Button variant="outline" size="lg" className="text-lg px-8 bg-transparent">
+              <Button
+                variant="outline"
+                size="lg"
+                className="text-lg px-8 bg-white/90 backdrop-blur-sm shadow-lg border-white"
+              >
                 Cấp cứu
               </Button>
             </div>
           </div>
         </div>
-      </section>
 
-      {/* Quick Appointment Booking Section */}
-      <section className="py-16 bg-background">
-        <div className="container mx-auto px-4">
-          <div className="text-center mb-12">
-            <h2 className="text-3xl lg:text-4xl font-bold text-foreground mb-4">Đặt lịch hẹn nhanh chóng</h2>
-            <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-              Đặt lịch khám với bác sĩ chuyên khoa chỉ trong vài phút. Chúng tôi sẽ xác nhận lịch hẹn của bạn sớm nhất.
-            </p>
-          </div>
-          
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-6xl mx-auto">
-            {/* Quick Stats */}
-            <Card className="text-center">
-              <CardHeader>
-                <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <Clock className="w-6 h-6 text-blue-600" />
-                </div>
-                <CardTitle className="text-2xl font-bold text-blue-600">24/7</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-muted-foreground">Dịch vụ cấp cứu</p>
-              </CardContent>
-            </Card>
-
-            {/* Appointment Booking Card */}
-            <Card className="text-center hover:shadow-lg transition-shadow cursor-pointer h-full" asChild>
-              <Link href="/auth">
-                <CardHeader>
-                  <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                    <Calendar className="w-6 h-6 text-blue-600" />
-                  </div>
-                  <CardTitle className="text-2xl font-bold text-blue-600">Đặt lịch hẹn</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-muted-foreground mb-4">
-                    Đặt lịch khám với bác sĩ chuyên khoa
-                  </p>
-                  <Button className="w-full">
-                    Đặt lịch ngay
-                  </Button>
-                </CardContent>
-              </Link>
-            </Card>
-
-            <Card className="text-center">
-              <CardHeader>
-                <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <UserCheck className="w-6 h-6 text-green-600" />
-                </div>
-                <CardTitle className="text-2xl font-bold text-green-600">50+</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-muted-foreground">Bác sĩ chuyên khoa</p>
-              </CardContent>
-            </Card>
-          </div>
+        <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2 flex gap-2 z-10">
+          {heroImages.map((_, index) => (
+            <button
+              key={index}
+              onClick={() => setCurrentSlide(index)}
+              className={`w-3 h-3 rounded-full transition-all ${
+                index === currentSlide ? "bg-primary scale-125" : "bg-white/70 hover:bg-white/90"
+              }`}
+            />
+          ))}
         </div>
       </section>
 
@@ -329,7 +325,7 @@ export default function HospitalLandingPage() {
           </div>
           <div className="text-center mt-12">
             <Button variant="outline" size="lg" asChild>
-              <Link href="/news">Xem tất cả tin tức</Link>
+              <a href="/news">Xem tất cả tin tức</a>
             </Button>
           </div>
         </div>

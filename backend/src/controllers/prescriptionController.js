@@ -108,7 +108,7 @@ class PrescriptionController {
                 first_name: true,
                 last_name: true,
                 email: true,
-                contact_number: true
+                phone: true
               }
             },
             doctor: {
@@ -162,7 +162,7 @@ class PrescriptionController {
               first_name: true,
               last_name: true,
               email: true,
-              contact_number: true,
+              phone: true,
               date_of_birth: true,
               gender: true,
               address: true,

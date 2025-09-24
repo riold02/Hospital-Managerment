@@ -40,6 +40,7 @@ import {
 import { useToast } from "@/hooks/use-toast"
 import { useAuth } from "@/lib/auth-context"
 import { apiClient, ApiError } from "@/lib/api-client"
+import PatientOverview from "@/components/patient/PatientOverview"
 
 interface Appointment {
   id?: number
@@ -257,7 +258,19 @@ export default function PatientDashboard() {
             })
           }
           
-          setAppointments(Array.isArray(appointmentsData) ? appointmentsData : [])
+          // Format appointments data before setting
+          const formattedAppointments = Array.isArray(appointmentsData) ? appointmentsData.map(apt => ({
+            id: apt.appointment_id || apt.id,
+            doctor: apt.doctor ? `${apt.doctor.first_name || apt.doctor.firstName || ''} ${apt.doctor.last_name || apt.doctor.lastName || ''}`.trim() : 'N/A',
+            department: apt.doctor?.specialty || apt.department || 'N/A',
+            date: apt.appointment_date ? new Date(apt.appointment_date).toISOString().split('T')[0] : apt.date,
+            time: apt.appointment_time ? new Date(apt.appointment_time).toTimeString().slice(0, 5) : apt.time,
+            purpose: apt.purpose || '',
+            status: apt.status === 'Scheduled' ? 'Chờ xác nhận' : apt.status,
+            canCancel: apt.status === 'Scheduled' || apt.status === 'Chờ xác nhận'
+          })) : []
+          
+          setAppointments(formattedAppointments)
         } catch (error) {
           console.error("[v0] Error fetching patient appointments:", error)
           setAppointments([])
@@ -326,14 +339,25 @@ export default function PatientDashboard() {
 
   const handleBookAppointment = async (formData: any) => {
     try {
+      // Validate user authentication
+      if (!user) {
+        toast({
+          title: "Lỗi xác thực",
+          description: "Vui lòng đăng nhập để đặt lịch hẹn.",
+          variant: "destructive",
+        })
+        return;
+      }
+
       const appointmentData = {
         doctor_id: Number(formData.doctor_id),
         appointment_date: formData.appointment_date,
         appointment_time: formData.appointment_time,
         purpose: formData.purpose,
-        status: 'scheduled'
+        status: 'Scheduled'
       }
 
+      console.log('Submitting appointment data:', appointmentData)
       const newAppointment = await apiClient.createAppointment(appointmentData)
       
       // Convert backend response to frontend format
@@ -342,10 +366,10 @@ export default function PatientDashboard() {
         doctor: `${newAppointment.doctor?.first_name || ''} ${newAppointment.doctor?.last_name || ''}`.trim(),
         department: newAppointment.doctor?.specialty || 'N/A',
         date: new Date(newAppointment.appointment_date).toISOString().split('T')[0],
-        time: newAppointment.appointment_time,
+        time: new Date(newAppointment.appointment_time).toTimeString().slice(0, 5), // Format HH:MM
         purpose: newAppointment.purpose || '',
-        status: 'Chờ xác nhận',
-        canCancel: true
+        status: newAppointment.status === 'Scheduled' ? 'Chờ xác nhận' : newAppointment.status,
+        canCancel: newAppointment.status === 'Scheduled' || newAppointment.status === 'Chờ xác nhận'
       }
 
       setAppointments([...appointments, formattedAppointment])
@@ -367,7 +391,8 @@ export default function PatientDashboard() {
 
   const handleCancelAppointment = async (id: number) => {
     try {
-      await apiClient.updateAppointmentStatus(id.toString(), "Đã hủy")
+      // Call the cancel appointment endpoint
+      await apiClient.cancelAppointment(id.toString())
 
       setAppointments(appointments.map((apt) => (apt.id === id ? { ...apt, status: "Đã hủy", canCancel: false } : apt)))
       toast({
@@ -646,6 +671,25 @@ export default function PatientDashboard() {
             <h1 className="text-2xl font-bold text-gray-900 mb-2">Bảng điều khiển bệnh nhân</h1>
             <p className="text-gray-600">Quản lý lịch hẹn, đơn thuốc và hồ sơ y tế của bạn</p>
           </div>
+
+          {activeTab === "overview" && (
+            <PatientOverview
+              patientProfile={patientProfile}
+              appointments={appointments}
+              prescriptions={prescriptions}
+              medicalHistory={medicalHistory}
+              billing={billing}
+              upcomingAppointments={upcomingAppointments}
+              unpaidBills={unpaidBills}
+              onSetActiveTab={setActiveTab}
+              onOpenBooking={() => setIsBookingOpen(true)}
+              getStatusColor={getStatusColor}
+              getDoctorName={getDoctorName}
+              getAppointmentDate={getAppointmentDate}
+              getAppointmentTime={getAppointmentTime}
+              getAppointmentId={getAppointmentId}
+            />
+          )}
 
           {activeTab === "patients" && (
             <Card>

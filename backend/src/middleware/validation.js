@@ -279,10 +279,7 @@ const validateDoctor = [
 
 // Appointment validation rules
 const validateAppointment = [
-  body('patient_id')
-    .optional()
-    .isInt({ min: 1 })
-    .withMessage('Valid patient ID is required'),
+  // patient_id is extracted from JWT token, not from request body
   
   body('doctor_id')
     .isInt({ min: 1 })
@@ -292,16 +289,25 @@ const validateAppointment = [
     .isISO8601()
     .withMessage('Valid appointment date is required (YYYY-MM-DD)')
     .custom((value) => {
-      const appointmentDate = new Date(value);
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
+      // Create date objects in a timezone-neutral way
+      const [year, month, day] = value.split('-').map(Number);
+      const appointmentDate = new Date(year, month - 1, day); // month is 0-indexed
       
-      if (appointmentDate < today) {
+      const today = new Date();
+      const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+      
+      // Allow appointments from today onwards
+      if (appointmentDate < todayStart) {
+        console.log('Date validation failed:', {
+          appointmentDate: appointmentDate.toISOString(),
+          todayStart: todayStart.toISOString(),
+          raw: value
+        });
         throw new Error('Appointment date cannot be in the past');
       }
       
       // Don't allow appointments more than 3 months in advance
-      const maxDate = new Date();
+      const maxDate = new Date(today);
       maxDate.setMonth(maxDate.getMonth() + 3);
       if (appointmentDate > maxDate) {
         throw new Error('Appointment cannot be scheduled more than 3 months in advance');
@@ -316,8 +322,8 @@ const validateAppointment = [
     .custom((value) => {
       const [hours, minutes] = value.split(':').map(Number);
       
-      // Only allow appointments during business hours
-      if (hours < 8 || hours > 17 || (hours === 17 && minutes > 0)) {
+      // Only allow appointments during business hours (8:00 AM to 5:00 PM inclusive)
+      if (hours < 8 || hours > 17) {
         throw new Error('Appointments are only available between 8:00 AM and 5:00 PM');
       }
       
@@ -332,14 +338,21 @@ const validateAppointment = [
   body('purpose')
     .notEmpty()
     .withMessage('Purpose is required')
-    .isLength({ min: 10, max: 500 })
-    .withMessage('Purpose must be between 10 and 500 characters')
+    .isLength({ min: 5, max: 500 })
+    .withMessage('Purpose must be between 5 and 500 characters')
     .trim(),
   
   body('status')
     .optional()
-    .isIn(['scheduled', 'confirmed', 'in_progress', 'completed', 'cancelled', 'no_show'])
-    .withMessage('Invalid appointment status')
+    .custom((value) => {
+      if (!value) return true; // optional field
+      const validStatuses = ['scheduled', 'confirmed', 'in_progress', 'completed', 'cancelled', 'no_show'];
+      const normalizedValue = value.toLowerCase().replace(/\s+/g, '_');
+      if (!validStatuses.includes(normalizedValue)) {
+        throw new Error('Status must be one of: Scheduled, Confirmed, In Progress, Completed, Cancelled, No Show');
+      }
+      return true;
+    })
 ];
 
 // Doctor update validation (all fields optional)
