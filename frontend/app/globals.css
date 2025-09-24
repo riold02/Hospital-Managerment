@@ -4,70 +4,70 @@
 @custom-variant dark (&:is(.dark *));
 
 :root {
-  /* Updated color tokens to match emerald green design brief for help page */
+  /* Updated to green medical theme as requested */
   --background: #ffffff;
-  --foreground: #475569;
-  --card: #f1f5f9;
-  --card-foreground: #059669;
+  --foreground: #1e293b;
+  --card: #ffffff;
+  --card-foreground: #1e293b;
   --popover: #ffffff;
-  --popover-foreground: #475569;
+  --popover-foreground: #1e293b;
   --primary: #059669;
   --primary-foreground: #ffffff;
   --secondary: #10b981;
   --secondary-foreground: #ffffff;
-  --muted: #f1f5f9;
-  --muted-foreground: #475569;
-  --accent: #10b981;
+  --muted: #f0fdf4;
+  --muted-foreground: #64748b;
+  --accent: #047857;
   --accent-foreground: #ffffff;
-  --destructive: #d97706;
+  --destructive: #ef4444;
   --destructive-foreground: #ffffff;
-  --border: #e2e8f0;
+  --border: #d1fae5;
   --input: #ffffff;
-  --ring: rgba(0, 0, 0, 0.1);
+  --ring: rgba(5, 150, 105, 0.2);
   --chart-1: #059669;
   --chart-2: #10b981;
-  --chart-3: #d97706;
-  --chart-4: #164e63;
-  --chart-5: #f1f5f9;
-  --radius: 0.5rem;
-  --sidebar: #f1f5f9;
-  --sidebar-foreground: #475569;
+  --chart-3: #047857;
+  --chart-4: #065f46;
+  --chart-5: #064e3b;
+  --radius: 0.75rem;
+  --sidebar: #f0fdf4;
+  --sidebar-foreground: #1e293b;
   --sidebar-primary: #059669;
   --sidebar-primary-foreground: #ffffff;
   --sidebar-accent: #10b981;
   --sidebar-accent-foreground: #ffffff;
-  --sidebar-border: #e2e8f0;
-  --sidebar-ring: rgba(0, 0, 0, 0.1);
+  --sidebar-border: #d1fae5;
+  --sidebar-ring: rgba(5, 150, 105, 0.2);
   --font-inter: "Inter", sans-serif;
   --font-jetbrains-mono: "JetBrains Mono", monospace;
 }
 
 .dark {
-  /* Updated dark mode colors to maintain emerald theme consistency */
+  /* Updated dark mode to maintain green medical theme */
   --background: #0f172a;
   --foreground: #f1f5f9;
   --card: #1e293b;
   --card-foreground: #f1f5f9;
   --popover: #1e293b;
   --popover-foreground: #f1f5f9;
-  --primary: #059669;
+  --primary: #10b981;
   --primary-foreground: #ffffff;
-  --secondary: #334155;
+  --secondary: #475569;
   --secondary-foreground: #f1f5f9;
   --muted: #334155;
   --muted-foreground: #94a3b8;
-  --accent: #10b981;
+  --accent: #059669;
   --accent-foreground: #ffffff;
-  --destructive: #d97706;
+  --destructive: #ef4444;
   --destructive-foreground: #ffffff;
   --border: #334155;
   --input: #1e293b;
-  --ring: rgba(0, 0, 0, 0.1);
-  --chart-1: #059669;
-  --chart-2: #10b981;
-  --chart-3: #d97706;
-  --chart-4: #164e63;
-  --chart-5: #f1f5f9;
+  --ring: rgba(16, 185, 129, 0.3);
+  --chart-1: #10b981;
+  --chart-2: #059669;
+  --chart-3: #047857;
+  --chart-4: #065f46;
+  --chart-5: #064e3b;
   --sidebar: #1e293b;
   --sidebar-foreground: #f1f5f9;
   --sidebar-primary: #334155;
@@ -75,7 +75,7 @@
   --sidebar-accent: #10b981;
   --sidebar-accent-foreground: #ffffff;
   --sidebar-border: #334155;
-  --sidebar-ring: rgba(0, 0, 0, 0.1);
+  --sidebar-ring: rgba(16, 185, 129, 0.3);
 }
 
 @theme inline {

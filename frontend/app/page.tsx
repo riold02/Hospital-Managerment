@@ -1,3 +1,4 @@
+import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -49,9 +50,11 @@ export default function HospitalLandingPage() {
           </nav>
           <div className="flex items-center gap-3">
             <Button variant="outline" asChild>
-              <a href="/auth">Đăng nhập</a>
+              <Link href="/auth">Đăng nhập</Link>
             </Button>
-            <Button>Đặt lịch khám</Button>
+            <Button asChild>
+              <Link href="/auth">Đặt lịch khám</Link>
+            </Button>
           </div>
         </div>
       </header>
@@ -73,8 +76,8 @@ export default function HospitalLandingPage() {
               điều trị chuyên khoa, chúng tôi luôn sẵn sàng phục vụ bạn 24/7.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <Button size="lg" className="text-lg px-8">
-                Đặt lịch khám
+              <Button size="lg" className="text-lg px-8" asChild>
+                <Link href="/auth">Đặt lịch khám</Link>
               </Button>
               <Button variant="outline" size="lg" className="text-lg px-8 bg-transparent">
                 Cấp cứu
@@ -109,11 +112,24 @@ export default function HospitalLandingPage() {
             </Card>
 
             {/* Appointment Booking Card */}
-            <div className="md:col-span-1">
-              <PatientAppointmentBooking 
-                className="h-full"
-              />
-            </div>
+            <Card className="text-center hover:shadow-lg transition-shadow cursor-pointer h-full" asChild>
+              <Link href="/auth">
+                <CardHeader>
+                  <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <Calendar className="w-6 h-6 text-blue-600" />
+                  </div>
+                  <CardTitle className="text-2xl font-bold text-blue-600">Đặt lịch hẹn</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-muted-foreground mb-4">
+                    Đặt lịch khám với bác sĩ chuyên khoa
+                  </p>
+                  <Button className="w-full">
+                    Đặt lịch ngay
+                  </Button>
+                </CardContent>
+              </Link>
+            </Card>
 
             <Card className="text-center">
               <CardHeader>
@@ -313,7 +329,7 @@ export default function HospitalLandingPage() {
           </div>
           <div className="text-center mt-12">
             <Button variant="outline" size="lg" asChild>
-              <a href="/news">Xem tất cả tin tức</a>
+              <Link href="/news">Xem tất cả tin tức</Link>
             </Button>
           </div>
         </div>
