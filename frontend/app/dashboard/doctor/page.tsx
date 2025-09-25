@@ -47,18 +47,26 @@ import {
   DoorOpen,
   BedDouble,
   Building,
+  LogOut,
+  User
 } from "lucide-react"
-import AppointmentsPage from "@/app/appointments/page"
-import MedicalRecordsPage from "@/app/medical-records/page"
-import BillingPage from "@/app/billing/page"
-import MedicinePage from "@/app/medicine/page"
-import PharmacyPage from "@/app/pharmacy/page"
-import BloodBankPage from "@/app/blood-bank/page"
-import RoomsPage from "@/app/rooms/page"
-import RoomAssignmentsPage from "@/app/room-assignments/page"
-import PatientsPage from "@/app/patients/page"
-import DoctorsPage from "@/app/doctors/page"
-import StaffPage from "@/app/staff/page"
+import { useAuth } from "@/lib/auth-context"
+import { useUser } from "@/hooks/useUser"
+import { apiClient } from "@/lib/api-client"
+import { useRouter } from "next/navigation"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+// Comment out problematic imports
+// import AppointmentsPage from "@/app/appointments/page"
+// import MedicalRecordsPage from "@/app/medical-records/page"
+// import BillingPage from "@/app/billing/page"
+// import MedicinePage from "@/app/medicine/page"
+// import PharmacyPage from "@/app/pharmacy/page"
+// import BloodBankPage from "@/app/blood-bank/page"
+// import RoomsPage from "@/app/rooms/page"
+// import RoomAssignmentsPage from "@/app/room-assignments/page"
+// import PatientsPage from "@/app/patients/page"
+// import DoctorsPage from "@/app/doctors/page"
+// import StaffPage from "@/app/staff/page"
 
 // Mock data for comprehensive doctor dashboard
 const mockKPIData = {
@@ -189,13 +197,23 @@ const mockMessages = [
 ]
 
 export default function DoctorDashboard() {
+  console.log('DoctorDashboard component rendering')
+  const { user, logout } = useAuth()
+  const router = useRouter()
   const [activeTab, setActiveTab] = useState("timeline")
   const [selectedPatient, setSelectedPatient] = useState<any | null>(null)
   const [showPatientChart, setShowPatientChart] = useState(false)
-  const [kpiData] = useState(mockKPIData)
   const [filterStatus, setFilterStatus] = useState("all")
   const [loading, setLoading] = useState(false)
-  const [user, setUser] = useState({ full_name: "Nguyễn Văn A" }) // Mock user data
+  
+  // Real KPI Data States
+  const [appointments, setAppointments] = useState([])
+  const [inpatients, setInpatients] = useState([])
+  const [pendingResults, setPendingResults] = useState([])
+  const [messages, setMessages] = useState([])
+  const [criticalAlerts, setCriticalAlerts] = useState(0)
+  const [doctorInfo, setDoctorInfo] = useState<any>(null)
+  const [doctorId, setDoctorId] = useState<number | null>(null)
 
   // Clinical Notes State
   const [clinicalNotes, setClinicalNotes] = useState({
@@ -225,15 +243,168 @@ export default function DoctorDashboard() {
   })
 
   useEffect(() => {
-    loadDashboardData()
-  }, [])
+    if (user) {
+      loadDashboardData()
+    }
+  }, [user])
+
+  // Load appointments and related data when doctorId is available
+  useEffect(() => {
+    if (doctorId) {
+      loadAppointmentsData()
+    }
+  }, [doctorId])
+
+  const loadAppointmentsData = async () => {
+    try {
+      console.log('Loading appointments data for doctor_id:', doctorId)
+      const appointmentsResponse = await apiClient.get(`/appointments?doctor_id=${doctorId}`) as any
+      console.log('Appointments API Response:', appointmentsResponse)
+      console.log('appointmentsResponse.success:', appointmentsResponse?.success)
+      console.log('appointmentsResponse.data:', appointmentsResponse?.data)
+      
+      if (appointmentsResponse?.success && Array.isArray(appointmentsResponse.data)) {
+        console.log('Setting appointments data:', appointmentsResponse.data)
+        setAppointments(appointmentsResponse.data)
+      } else {
+        console.log('No appointments data found, using empty array')
+        setAppointments([])
+      }
+    } catch (error) {
+      console.error('Error loading appointments:', error)
+      setAppointments([])
+    }
+  }
 
   const loadDashboardData = async () => {
     setLoading(true)
+    console.log('Loading dashboard data for user:', user)
+    console.log('User user_id:', user?.user_id)
+    console.log('User email:', user?.email)
+    
     try {
-      await new Promise((resolve) => setTimeout(resolve, 1000))
-      //setAppointments(mockAppointments)
-      //setKPIData(mockKPIData)
+      // Load doctor information first
+      const userId = user?.user_id
+      console.log('Using user ID for API call:', userId)
+      
+      if (!userId) {
+        console.error('No user ID available, skipping doctor info load')
+        setDoctorInfo({
+          first_name: user?.full_name?.split(' ')[0] || 'Bác sĩ',
+          last_name: user?.full_name?.split(' ').slice(1).join(' ') || '',
+          specialty: 'Bác sĩ đa khoa'
+        })
+      } else {
+        try {
+          console.log('Attempting to load doctor info for user ID:', userId)
+          const doctorsResponse = await apiClient.get('/doctors') as any
+          console.log('Doctors API Response:', doctorsResponse)
+          console.log('doctorsResponse structure:', Object.keys(doctorsResponse || {}))
+          console.log('doctorsResponse.success:', doctorsResponse?.success)
+          console.log('doctorsResponse.data type:', typeof doctorsResponse?.data)
+          console.log('doctorsResponse.data is array:', Array.isArray(doctorsResponse?.data))
+          
+          if (doctorsResponse?.success && Array.isArray(doctorsResponse.data)) {
+            const doctorData = doctorsResponse.data.find((doctor: any) => doctor.user_id === userId)
+            console.log('Found doctor data:', doctorData)
+            
+            if (doctorData) {
+              setDoctorInfo({
+                first_name: doctorData.first_name,
+                last_name: doctorData.last_name,
+                specialty: doctorData.specialty,
+                doctor_id: doctorData.doctor_id
+              })
+              setDoctorId(doctorData.doctor_id) // Store doctor_id for appointments
+            } else {
+              console.log('No doctor found with user_id:', userId)
+              setDoctorInfo({
+                first_name: user?.full_name?.split(' ')[0] || 'Bác sĩ',
+                last_name: user?.full_name?.split(' ').slice(1).join(' ') || '',
+                specialty: 'Bác sĩ đa khoa'
+              })
+            }
+          } else {
+            console.log('No doctors data found, using fallback')
+            setDoctorInfo({
+              first_name: user?.full_name?.split(' ')[0] || 'Bác sĩ',
+              last_name: user?.full_name?.split(' ').slice(1).join(' ') || '',
+              specialty: 'Bác sĩ đa khoa'
+            })
+          }
+        } catch (error: any) {
+          console.error('Error loading doctor info:', error)
+          console.error('Error details:', error.response || error.message)
+          // Fallback to user info if doctor API fails
+          setDoctorInfo({
+            first_name: user?.full_name?.split(' ')[0] || 'Bác sĩ',
+            last_name: user?.full_name?.split(' ').slice(1).join(' ') || '',
+            specialty: 'Bác sĩ đa khoa'
+          })
+        }
+      }
+
+      // Appointments data will be loaded when doctorId is available
+
+      // Load real inpatients data
+      try {
+        console.log('Loading inpatients for doctor user_id:', userId)
+        const inpatientsResponse = await apiClient.get(`/patients?status=inpatient`) as any
+        console.log('Inpatients API response:', inpatientsResponse)
+        
+        if (inpatientsResponse?.success && Array.isArray(inpatientsResponse.data)) {
+          console.log('Setting real inpatients:', inpatientsResponse.data)
+          setInpatients(inpatientsResponse.data)
+        } else {
+          console.log('No inpatients data, using empty array')
+          setInpatients([])
+        }
+      } catch (error) {
+        console.error('Error loading inpatients:', error)
+        setInpatients([])
+      }
+
+      // Load real pending test results
+      try {
+        console.log('Loading pending results for doctor user_id:', userId)
+        const resultsResponse = await apiClient.get(`/medical-records?status=pending`) as any
+        console.log('Pending results API response:', resultsResponse)
+        
+        if (resultsResponse?.success && Array.isArray(resultsResponse.data)) {
+          console.log('Setting real pending results:', resultsResponse.data)
+          setPendingResults(resultsResponse.data)
+        } else {
+          console.log('No pending results, using empty array')
+          setPendingResults([])
+        }
+      } catch (error) {
+        console.error('Error loading pending results:', error)
+        setPendingResults([])
+      }
+
+      // Load real messages/notifications
+      try {
+        console.log('Loading messages for user_id:', userId)
+        const messagesResponse = await apiClient.get(`/notifications?user_id=${userId}`) as any
+        console.log('Messages API response:', messagesResponse)
+        
+        if (messagesResponse?.success && Array.isArray(messagesResponse.data)) {
+          console.log('Setting real messages:', messagesResponse.data)
+          setMessages(messagesResponse.data)
+        } else {
+          console.log('No messages data, using empty array')
+          setMessages([])
+        }
+      } catch (error) {
+        console.error('Error loading messages:', error)
+        setMessages([])
+      }
+      
+      // Set critical alerts based on real data (will be calculated from loaded data)
+      setCriticalAlerts(0)
+      
+      console.log('Dashboard data loaded successfully')
+
     } catch (error) {
       console.error("Error loading dashboard data:", error)
       toast({
@@ -246,21 +417,61 @@ export default function DoctorDashboard() {
     }
   }
 
+  // Calculate real KPI data from states
+  const kpiData = {
+    appointmentsToday: appointments.filter((apt: any) => {
+      const today = new Date().toDateString()
+      const appointmentDate = new Date(apt.appointment_date).toDateString()
+      return appointmentDate === today
+    }).length,
+    completedToday: appointments.filter((apt: any) => apt.status === "Completed" || apt.status === "Hoàn thành").length,
+    pendingResults: pendingResults.length,
+    criticalAlerts: criticalAlerts,
+    inpatients: inpatients.length,
+    newMessages: messages.filter((msg: any) => !msg.read).length
+  }
+  console.log('Messages:', messages)
+
+  const handleLogout = async () => {
+    try {
+      await logout()
+      router.push('/auth')
+    } catch (error) {
+      console.error('Logout error:', error)
+    }
+  }
+
   const getStatusBadge = (status: string) => {
-    const config = {
-      "Đã đến": { variant: "default" as const, color: "bg-green-100 text-green-800", icon: CheckCircle },
-      "Đang chờ": { variant: "secondary" as const, color: "bg-blue-100 text-blue-800", icon: Clock },
+    // Map English status to Vietnamese
+    const statusMap: { [key: string]: string } = {
+      "Scheduled": "Đã lên lịch",
+      "Confirmed": "Đã xác nhận", 
+      "In Progress": "Đang khám",
+      "Completed": "Hoàn thành",
+      "Cancelled": "Đã hủy",
+      "No Show": "Vắng mặt"
+    }
+    
+    const config: { [key: string]: any } = {
+      "Đã lên lịch": { variant: "secondary" as const, color: "bg-blue-100 text-blue-800", icon: Clock },
+      "Scheduled": { variant: "secondary" as const, color: "bg-blue-100 text-blue-800", icon: Clock },
+      "Đã xác nhận": { variant: "default" as const, color: "bg-green-100 text-green-800", icon: CheckCircle },
+      "Confirmed": { variant: "default" as const, color: "bg-green-100 text-green-800", icon: CheckCircle },
       "Đang khám": { variant: "outline" as const, color: "bg-yellow-100 text-yellow-800", icon: Stethoscope },
+      "In Progress": { variant: "outline" as const, color: "bg-yellow-100 text-yellow-800", icon: Stethoscope },
       "Hoàn thành": { variant: "default" as const, color: "bg-green-100 text-green-800", icon: CheckCircle },
-      "Trễ hẹn": { variant: "destructive" as const, color: "bg-red-100 text-red-800", icon: AlertTriangle },
+      "Completed": { variant: "default" as const, color: "bg-green-100 text-green-800", icon: CheckCircle },
+      "Đã hủy": { variant: "destructive" as const, color: "bg-red-100 text-red-800", icon: AlertTriangle },
+      "Cancelled": { variant: "destructive" as const, color: "bg-red-100 text-red-800", icon: AlertTriangle },
     }
 
-    const { color, icon: Icon } = config[status] || config["Đang chờ"]
+    const displayStatus = statusMap[status] || status
+    const { color, icon: Icon } = config[status] || config["Scheduled"]
 
     return (
       <Badge className={`${color} flex items-center gap-1`}>
         <Icon className="h-3 w-3" />
-        {status}
+        {displayStatus}
       </Badge>
     )
   }
@@ -306,7 +517,12 @@ export default function DoctorDashboard() {
             </div>
             <div>
               <h1 className="text-lg font-bold text-gray-900">Dashboard Bác sĩ</h1>
-              <p className="text-sm text-gray-500">Dr. {user?.full_name || "Nguyễn Văn A"}</p>
+              <p className="text-sm text-gray-500">
+                {doctorInfo ? `${doctorInfo.first_name} ${doctorInfo.last_name}` : (user?.full_name || user?.email || "Bác sĩ")}
+              </p>
+              {doctorInfo?.specialty && (
+                <p className="text-xs text-gray-400">{doctorInfo.specialty}</p>
+              )}
             </div>
           </div>
         </div>
@@ -446,19 +662,40 @@ export default function DoctorDashboard() {
           })}
         </nav>
 
-        {/* User Profile */}
-        <div className="p-4 border-t border-gray-200">
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
-              <span className="text-sm font-medium text-green-600">{user?.full_name?.charAt(0) || "N"}</span>
+        {/* User Info & Logout Button */}
+        <div className="border-t border-gray-200">
+          {/* User Info */}
+          <div className="p-4 bg-gray-50">
+            <div className="flex items-center gap-3">
+              <Avatar className="h-8 w-8">
+                <AvatarImage src="/placeholder-user.jpg" alt="Doctor Avatar" />
+                <AvatarFallback>
+                  <User className="h-4 w-4" />
+                </AvatarFallback>
+              </Avatar>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-gray-900 truncate">
+                  {doctorInfo ? `${doctorInfo.first_name} ${doctorInfo.last_name}` : (user?.full_name || user?.email || "Bác sĩ")}
+                </p>
+                <p className="text-xs text-gray-500 truncate">
+                  {user?.email || "doctor@hospital.vn"}
+                </p>
+                <Badge variant="secondary" className="text-xs mt-1">
+                  DOCTOR
+                </Badge>
+              </div>
             </div>
-            <div className="flex-1">
-              <p className="text-sm font-medium text-gray-900">{user?.full_name || "Nguyễn Văn A"}</p>
-              <p className="text-xs text-gray-500">Khoa Tim Mạch</p>
-            </div>
-            <Button variant="ghost" size="sm">
-              <Settings className="h-4 w-4" />
-            </Button>
+          </div>
+          
+          {/* Logout Button */}
+          <div className="p-4">
+            <button
+              onClick={handleLogout}
+              className="w-full flex items-center space-x-3 px-3 py-2 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
+            >
+              <LogOut className="h-5 w-5" />
+              <span>Đăng xuất</span>
+            </button>
           </div>
         </div>
       </div>
@@ -477,8 +714,9 @@ export default function DoctorDashboard() {
                 {activeTab === "inbox" && "Hộp thư"}
               </h2>
               <p className="text-sm text-gray-500">
-                Chào buổi {new Date().getHours() < 12 ? "sáng" : new Date().getHours() < 18 ? "chiều" : "tối"}, Dr.{" "}
-                {user?.full_name || "Nguyễn Văn A"}
+                Chào buổi {new Date().getHours() < 12 ? "sáng" : new Date().getHours() < 18 ? "chiều" : "tối"}, {" "}
+                {doctorInfo ? `${doctorInfo.first_name} ${doctorInfo.last_name}` : (user?.full_name || user?.email || "Bác sĩ")}
+                {doctorInfo?.specialty && ` - ${doctorInfo.specialty}`}
               </p>
             </div>
             <div className="flex items-center gap-4">
@@ -647,13 +885,30 @@ export default function DoctorDashboard() {
                       <CardContent>
                         <div className="space-y-4">
                           <div className="space-y-4">
-                            {mockAppointments.map((appointment, index) => (
+                            {appointments && appointments.length > 0 ? appointments.filter((appointment: any) => {
+                              const today = new Date().toDateString()
+                              const appointmentDate = new Date(appointment.appointment_date).toDateString()
+                              return appointmentDate === today
+                            }).map((appointment, index) => (
                               <div
-                                key={appointment.id}
+                                key={appointment.appointment_id || appointment.id}
                                 className="flex items-center gap-4 p-4 rounded-lg border hover:bg-green-50 transition-colors"
                               >
                                 <div className="text-center min-w-16">
-                                  <div className="text-lg font-bold text-green-800">{appointment.time}</div>
+                                  <div className="text-lg font-bold text-green-800">
+                                    {appointment.appointment_time 
+                                      ? new Date(appointment.appointment_time).toLocaleTimeString('vi-VN', { 
+                                          hour: '2-digit', 
+                                          minute: '2-digit',
+                                          hour12: false 
+                                        })
+                                      : new Date(appointment.appointment_date).toLocaleTimeString('vi-VN', { 
+                                          hour: '2-digit', 
+                                          minute: '2-digit',
+                                          hour12: false 
+                                        })
+                                    }
+                                  </div>
                                   <div className="text-xs text-green-600">
                                     {index === 0 ? "Tiếp theo" : `+${index * 45}m`}
                                   </div>
@@ -662,79 +917,65 @@ export default function DoctorDashboard() {
                                 <div className="flex-1">
                                   <div className="flex items-center gap-3">
                                     <img
-                                      src={appointment.avatar || "/placeholder.svg"}
-                                      alt={appointment.patient}
+                                      src="/placeholder-user.jpg"
+                                      alt={`${appointment.patient?.first_name || ''} ${appointment.patient?.last_name || ''}`.trim() || 'Bệnh nhân'}
                                       className="w-8 h-8 rounded-full"
                                     />
                                     <div>
                                       <HoverCard>
                                         <HoverCardTrigger asChild>
                                           <Button variant="link" className="p-0 h-auto font-semibold text-green-800">
-                                            {appointment.patient}
+                                            {`${appointment.patient?.first_name || ''} ${appointment.patient?.last_name || ''}`.trim() || 'Không có tên'}
                                           </Button>
                                         </HoverCardTrigger>
                                         <HoverCardContent className="w-80">
                                           <div className="space-y-3">
                                             <div className="flex items-center gap-3">
                                               <img
-                                                src={appointment.avatar || "/placeholder.svg"}
+                                                src="/placeholder-user.jpg"
                                                 alt=""
                                                 className="w-12 h-12 rounded-full"
                                               />
                                               <div>
-                                                <h4 className="font-semibold">{appointment.patient}</h4>
+                                                <h4 className="font-semibold">{`${appointment.patient?.first_name || ''} ${appointment.patient?.last_name || ''}`.trim() || 'Không có tên'}</h4>
                                                 <p className="text-sm text-muted-foreground">
-                                                  {appointment.age} tuổi • {appointment.gender}
+                                                  {appointment.patient?.date_of_birth 
+                                                    ? `${new Date().getFullYear() - new Date(appointment.patient.date_of_birth).getFullYear()} tuổi` 
+                                                    : 'Chưa có thông tin tuổi'
+                                                  } • {appointment.patient?.gender || 'Chưa xác định'}
                                                 </p>
                                               </div>
                                             </div>
 
-                                            {appointment.allergies.length > 0 && (
+                                            {appointment.patient?.allergies && (
                                               <div>
                                                 <p className="text-sm font-medium text-red-600 mb-1">Dị ứng:</p>
                                                 <div className="flex flex-wrap gap-1">
-                                                  {appointment.allergies.map((allergy) => (
-                                                    <Badge key={allergy} className="bg-red-100 text-red-800">
-                                                      {allergy}
-                                                    </Badge>
-                                                  ))}
+                                                  <Badge className="bg-red-100 text-red-800">
+                                                    {appointment.patient.allergies}
+                                                  </Badge>
                                                 </div>
                                               </div>
                                             )}
 
-                                            <div>
-                                              <p className="text-sm font-medium mb-1">Bệnh nền:</p>
-                                              <div className="flex flex-wrap gap-1">
-                                                {appointment.conditions.map((condition) => (
-                                                  <Badge key={condition} variant="outline">
-                                                    {condition}
+                                            {appointment.patient?.medical_history && (
+                                              <div>
+                                                <p className="text-sm font-medium mb-1">Bệnh sử:</p>
+                                                <div className="flex flex-wrap gap-1">
+                                                  <Badge variant="outline">
+                                                    {appointment.patient.medical_history}
                                                   </Badge>
-                                                ))}
+                                                </div>
                                               </div>
-                                            </div>
-
-                                            <div className="grid grid-cols-3 gap-2 text-sm">
-                                              <div>
-                                                <p className="font-medium">Huyết áp</p>
-                                                <p>{appointment.vitals.bp}</p>
-                                              </div>
-                                              <div>
-                                                <p className="font-medium">Mạch</p>
-                                                <p>{appointment.vitals.hr}</p>
-                                              </div>
-                                              <div>
-                                                <p className="font-medium">Nhiệt độ</p>
-                                                <p>{appointment.vitals.temp}°C</p>
-                                              </div>
-                                            </div>
+                                            )}
 
                                             <p className="text-xs text-muted-foreground">
-                                              Lần khám gần nhất: {appointment.lastVisit}
+                                              Số điện thoại: {appointment.patient?.phone || 'Chưa có'}
                                             </p>
                                           </div>
                                         </HoverCardContent>
                                       </HoverCard>
-                                      <p className="text-sm text-muted-foreground">{appointment.purpose}</p>
+                                      <p className="text-sm text-muted-foreground">{appointment.purpose || 'Khám tổng quát'}</p>
                                     </div>
                                   </div>
                                 </div>
@@ -753,7 +994,12 @@ export default function DoctorDashboard() {
                                   )}
                                 </div>
                               </div>
-                            ))}
+                            )) : (
+                              <div className="text-center py-8 text-gray-500">
+                                <Clock className="h-12 w-12 mx-auto mb-3 opacity-50" />
+                                <p>Không có lịch hẹn nào hôm nay</p>
+                              </div>
+                            )}
                           </div>
                         </div>
                       </CardContent>
@@ -796,26 +1042,34 @@ export default function DoctorDashboard() {
                       <CardContent>
                         <div className="space-y-3">
                           <div className="space-y-3">
-                            {mockMessages.map((message) => (
+                            {messages && messages.length > 0 ? messages.map((message) => (
                               <div key={message.id} className="p-3 rounded-lg border-l-4 border-l-blue-500 bg-blue-50">
                                 <div className="flex items-center justify-between mb-1">
-                                  <p className="text-sm font-medium">{message.from}</p>
+                                  <p className="text-sm font-medium">{message.sender?.full_name || 'Hệ thống'}</p>
                                   <Badge
                                     className={
-                                      message.priority === "Cao"
+                                      message.priority === "high"
                                         ? "bg-red-100 text-red-800"
-                                        : message.priority === "Trung bình"
+                                        : message.priority === "medium"
                                           ? "bg-yellow-100 text-yellow-800"
                                           : "bg-green-100 text-green-800"
                                     }
                                   >
-                                    {message.priority}
+                                    {message.priority === "high" ? "Cao" : 
+                                     message.priority === "medium" ? "Trung bình" : "Thấp"}
                                   </Badge>
                                 </div>
                                 <p className="text-sm text-muted-foreground mb-1">{message.message}</p>
-                                <p className="text-xs text-muted-foreground">{message.time}</p>
+                                <p className="text-xs text-muted-foreground">
+                                  {new Date(message.created_at).toLocaleString('vi-VN')}
+                                </p>
                               </div>
-                            ))}
+                            )) : (
+                              <div className="text-center py-6 text-gray-500">
+                                <Bell className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                                <p>Không có thông báo mới</p>
+                              </div>
+                            )}
                           </div>
                         </div>
                       </CardContent>
@@ -1116,40 +1370,37 @@ export default function DoctorDashboard() {
                   </CardHeader>
                   <CardContent>
                     <div className="grid gap-4">
-                      {mockInpatients.map((patient) => (
+                      {inpatients && inpatients.length > 0 ? inpatients.map((patient) => (
                         <div key={patient.id} className="p-4 rounded-lg border hover:bg-green-50 transition-colors">
                           <div className="flex items-center justify-between">
                             <div className="flex items-center gap-4">
                               <div className="text-center">
-                                <p className="font-bold text-green-800">{patient.room}</p>
-                                <p className="text-sm text-green-600">Giường {patient.bed}</p>
+                                <p className="font-bold text-green-800">{patient.room_assignment?.room?.room_number || 'N/A'}</p>
+                                <p className="text-sm text-green-600">Giường {patient.room_assignment?.bed_number || 'N/A'}</p>
                               </div>
                               <div>
-                                <h4 className="font-semibold">{patient.patient}</h4>
-                                <p className="text-sm text-muted-foreground">{patient.condition}</p>
+                                <h4 className="font-semibold">{patient.full_name}</h4>
+                                <p className="text-sm text-muted-foreground">{patient.medical_history || 'Chưa có thông tin'}</p>
                                 <div className="flex items-center gap-2 mt-1">
-                                  {getPriorityBadge(patient.priority)}
-                                  <Badge variant="outline">{patient.orders} y lệnh chờ</Badge>
+                                  <Badge className="bg-blue-100 text-blue-800">Nội trú</Badge>
+                                  <Badge variant="outline">
+                                    {patient.date_of_birth 
+                                      ? `${new Date().getFullYear() - new Date(patient.date_of_birth).getFullYear()} tuổi`
+                                      : 'Chưa rõ tuổi'
+                                    }
+                                  </Badge>
                                 </div>
                               </div>
                             </div>
 
-                            <div className="grid grid-cols-4 gap-3 text-center text-sm">
+                            <div className="grid grid-cols-2 gap-3 text-center text-sm">
                               <div>
-                                <p className="font-medium">BP</p>
-                                <p>{patient.vitals.bp}</p>
+                                <p className="font-medium">Giới tính</p>
+                                <p>{patient.gender || 'N/A'}</p>
                               </div>
                               <div>
-                                <p className="font-medium">HR</p>
-                                <p>{patient.vitals.hr}</p>
-                              </div>
-                              <div>
-                                <p className="font-medium">Temp</p>
-                                <p>{patient.vitals.temp}</p>
-                              </div>
-                              <div>
-                                <p className="font-medium">SpO₂</p>
-                                <p>{patient.vitals.spo2}</p>
+                                <p className="font-medium">Điện thoại</p>
+                                <p>{patient.phone_number || 'N/A'}</p>
                               </div>
                             </div>
 
@@ -1165,7 +1416,13 @@ export default function DoctorDashboard() {
                             </div>
                           </div>
                         </div>
-                      ))}
+                      )) : (
+                        <div className="text-center py-12 text-gray-500">
+                          <Bed className="h-16 w-16 mx-auto mb-4 opacity-30" />
+                          <h3 className="text-lg font-medium mb-2">Không có bệnh nhân nội trú</h3>
+                          <p>Hiện tại không có bệnh nhân nội trú nào.</p>
+                        </div>
+                      )}
                     </div>
                   </CardContent>
                 </Card>
@@ -1182,25 +1439,30 @@ export default function DoctorDashboard() {
                   </CardHeader>
                   <CardContent>
                     <div className="space-y-4">
-                      {mockPendingResults.map((result) => (
+                      {pendingResults && pendingResults.length > 0 ? pendingResults.map((result) => (
                         <div key={result.id} className="p-4 rounded-lg border hover:bg-green-50 transition-colors">
                           <div className="flex items-center justify-between">
                             <div>
-                              <h4 className="font-semibold">{result.patient}</h4>
-                              <p className="text-sm text-muted-foreground">{result.test}</p>
+                              <h4 className="font-semibold">{result.patient?.full_name || 'Không có tên'}</h4>
+                              <p className="text-sm text-muted-foreground">{result.test_type || 'Xét nghiệm'}</p>
+                              <p className="text-xs text-gray-500">
+                                Ngày xét nghiệm: {new Date(result.test_date).toLocaleDateString('vi-VN')}
+                              </p>
                             </div>
                             <div className="flex items-center gap-3">
-                              {getPriorityBadge(result.priority)}
                               <Badge
                                 className={
-                                  result.status === "Hoàn thành"
+                                  result.status === "completed"
                                     ? "bg-green-100 text-green-800"
-                                    : "bg-yellow-100 text-yellow-800"
+                                    : result.status === "pending"
+                                    ? "bg-yellow-100 text-yellow-800"
+                                    : "bg-blue-100 text-blue-800"
                                 }
                               >
-                                {result.status}
+                                {result.status === "completed" ? "Hoàn thành" : 
+                                 result.status === "pending" ? "Chờ kết quả" : "Đang xử lý"}
                               </Badge>
-                              {result.status === "Hoàn thành" && (
+                              {result.status === "completed" && (
                                 <Button size="sm" className="bg-green-600 hover:bg-green-700">
                                   <Eye className="h-3 w-3 mr-1" />
                                   Xem kết quả
@@ -1209,7 +1471,13 @@ export default function DoctorDashboard() {
                             </div>
                           </div>
                         </div>
-                      ))}
+                      )) : (
+                        <div className="text-center py-12 text-gray-500">
+                          <TestTube className="h-16 w-16 mx-auto mb-4 opacity-30" />
+                          <h3 className="text-lg font-medium mb-2">Không có kết quả xét nghiệm</h3>
+                          <p>Chưa có kết quả cận lâm sàng nào.</p>
+                        </div>
+                      )}
                     </div>
                   </CardContent>
                 </Card>
@@ -1226,18 +1494,27 @@ export default function DoctorDashboard() {
                   </CardHeader>
                   <CardContent>
                     <div className="space-y-4">
-                      {mockMessages.map((message) => (
+                      {messages && messages.length > 0 ? messages.map((message) => (
                         <div key={message.id} className="p-4 rounded-lg border hover:bg-green-50 transition-colors">
                           <div className="flex items-center justify-between mb-2">
-                            <h4 className="font-semibold">{message.from}</h4>
+                            <h4 className="font-semibold">{message.sender?.full_name || 'Hệ thống'}</h4>
                             <div className="flex items-center gap-2">
-                              {getPriorityBadge(message.priority)}
-                              <span className="text-sm text-muted-foreground">{message.time}</span>
+                              {getPriorityBadge(message.priority === "high" ? "Cao" : 
+                                               message.priority === "medium" ? "Trung bình" : "Thấp")}
+                              <span className="text-sm text-muted-foreground">
+                                {new Date(message.created_at).toLocaleString('vi-VN')}
+                              </span>
                             </div>
                           </div>
                           <p className="text-sm text-muted-foreground">{message.message}</p>
                         </div>
-                      ))}
+                      )) : (
+                        <div className="text-center py-12 text-gray-500">
+                          <MessageSquare className="h-16 w-16 mx-auto mb-4 opacity-30" />
+                          <h3 className="text-lg font-medium mb-2">Không có tin nhắn</h3>
+                          <p>Chưa có tin nhắn hoặc thông báo nào.</p>
+                        </div>
+                      )}
                     </div>
                   </CardContent>
                 </Card>
@@ -1260,7 +1537,9 @@ export default function DoctorDashboard() {
                       </p>
                     </div>
                     <div className="opacity-95 [&_button:has(svg.lucide-plus)]:hidden [&_button:has(svg.lucide-edit)]:hidden [&_button:has(svg.lucide-trash)]:hidden [&_button:has(svg.lucide-user-plus)]:hidden [&_button[aria-label*='Tạo']]:hidden [&_button[aria-label*='Thêm']]:hidden [&_button[aria-label*='Sửa']]:hidden [&_button[aria-label*='Xóa']]:hidden [&_button:contains('Tạo')]:hidden [&_button:contains('Thêm')]:hidden [&_button:contains('Sửa')]:hidden [&_button:contains('Xóa')]:hidden">
-                      <PatientsPage />
+                      <div className="p-4 bg-gray-50 rounded-lg">
+                        <p className="text-gray-600">Chức năng quản lý bệnh nhân đang được phát triển...</p>
+                      </div>
                     </div>
                   </CardContent>
                 </Card>
@@ -1283,7 +1562,9 @@ export default function DoctorDashboard() {
                       </p>
                     </div>
                     <div className="opacity-95 [&_button:has(svg.lucide-plus)]:hidden [&_button:has(svg.lucide-edit)]:hidden [&_button:has(svg.lucide-trash)]:hidden [&_button:has(svg.lucide-user-plus)]:hidden [&_button[aria-label*='Tạo']]:hidden [&_button[aria-label*='Thêm']]:hidden [&_button[aria-label*='Sửa']]:hidden [&_button[aria-label*='Xóa']]:hidden [&_button:contains('Tạo')]:hidden [&_button:contains('Thêm')]:hidden [&_button:contains('Sửa')]:hidden [&_button:contains('Xóa')]:hidden">
-                      <DoctorsPage />
+                      <div className="p-4 bg-gray-50 rounded-lg">
+                        <p className="text-gray-600">Chức năng quản lý bác sĩ đang được phát triển...</p>
+                      </div>
                     </div>
                   </CardContent>
                 </Card>
@@ -1306,7 +1587,9 @@ export default function DoctorDashboard() {
                       </p>
                     </div>
                     <div className="opacity-95 [&_button:has(svg.lucide-plus)]:hidden [&_button:has(svg.lucide-edit)]:hidden [&_button:has(svg.lucide-trash)]:hidden [&_button:has(svg.lucide-user-plus)]:hidden [&_button[aria-label*='Tạo']]:hidden [&_button[aria-label*='Thêm']]:hidden [&_button[aria-label*='Sửa']]:hidden [&_button[aria-label*='Xóa']]:hidden [&_button:contains('Tạo')]:hidden [&_button:contains('Thêm')]:hidden [&_button:contains('Sửa')]:hidden [&_button:contains('Xóa')]:hidden">
-                      <StaffPage />
+                      <div className="p-4 bg-gray-50 rounded-lg">
+                        <p className="text-gray-600">Chức năng quản lý nhân viên đang được phát triển...</p>
+                      </div>
                     </div>
                   </CardContent>
                 </Card>
@@ -1329,7 +1612,9 @@ export default function DoctorDashboard() {
                       </p>
                     </div>
                     <div className="opacity-95 [&_button:has(svg.lucide-plus)]:hidden [&_button:has(svg.lucide-edit)]:hidden [&_button:has(svg.lucide-trash)]:hidden [&_button:has(svg.lucide-user-plus)]:hidden [&_button[aria-label*='Tạo']]:hidden [&_button[aria-label*='Thêm']]:hidden [&_button[aria-label*='Sửa']]:hidden [&_button[aria-label*='Xóa']]:hidden [&_button:contains('Tạo')]:hidden [&_button:contains('Thêm')]:hidden [&_button:contains('Sửa')]:hidden [&_button:contains('Xóa')]:hidden">
-                      <AppointmentsPage />
+                      <div className="p-4 bg-gray-50 rounded-lg">
+                        <p className="text-gray-600">Chức năng lịch hẹn đang được phát triển...</p>
+                      </div>
                     </div>
                   </CardContent>
                 </Card>
@@ -1352,7 +1637,9 @@ export default function DoctorDashboard() {
                       </p>
                     </div>
                     <div className="opacity-95 [&_button:has(svg.lucide-plus)]:hidden [&_button:has(svg.lucide-edit)]:hidden [&_button:has(svg.lucide-trash)]:hidden [&_button:has(svg.lucide-user-plus)]:hidden [&_button[aria-label*='Tạo']]:hidden [&_button[aria-label*='Thêm']]:hidden [&_button[aria-label*='Sửa']]:hidden [&_button[aria-label*='Xóa']]:hidden [&_button:contains('Tạo')]:hidden [&_button:contains('Thêm')]:hidden [&_button:contains('Sửa')]:hidden [&_button:contains('Xóa')]:hidden">
-                      <MedicalRecordsPage />
+                      <div className="p-4 bg-gray-50 rounded-lg">
+                        <p className="text-gray-600">Chức năng hồ sơ bệnh án đang được phát triển...</p>
+                      </div>
                     </div>
                   </CardContent>
                 </Card>
@@ -1375,7 +1662,9 @@ export default function DoctorDashboard() {
                       </p>
                     </div>
                     <div className="opacity-95 [&_button:has(svg.lucide-plus)]:hidden [&_button:has(svg.lucide-edit)]:hidden [&_button:has(svg.lucide-trash)]:hidden [&_button:has(svg.lucide-user-plus)]:hidden [&_button[aria-label*='Tạo']]:hidden [&_button[aria-label*='Thêm']]:hidden [&_button[aria-label*='Sửa']]:hidden [&_button[aria-label*='Xóa']]:hidden [&_button:contains('Tạo')]:hidden [&_button:contains('Thêm')]:hidden [&_button:contains('Sửa')]:hidden [&_button:contains('Xóa')]:hidden">
-                      <BillingPage />
+                      <div className="p-4 bg-gray-50 rounded-lg">
+                        <p className="text-gray-600">Chức năng thanh toán đang được phát triển...</p>
+                      </div>
                     </div>
                   </CardContent>
                 </Card>
@@ -1398,7 +1687,9 @@ export default function DoctorDashboard() {
                       </p>
                     </div>
                     <div className="opacity-95 [&_button:has(svg.lucide-plus)]:hidden [&_button:has(svg.lucide-edit)]:hidden [&_button:has(svg.lucide-trash)]:hidden [&_button:has(svg.lucide-user-plus)]:hidden [&_button[aria-label*='Tạo']]:hidden [&_button[aria-label*='Thêm']]:hidden [&_button[aria-label*='Sửa']]:hidden [&_button[aria-label*='Xóa']]:hidden [&_button:contains('Tạo')]:hidden [&_button:contains('Thêm')]:hidden [&_button:contains('Sửa')]:hidden [&_button:contains('Xóa')]:hidden">
-                      <MedicinePage />
+                      <div className="p-4 bg-gray-50 rounded-lg">
+                        <p className="text-gray-600">Chức năng quản lý thuốc đang được phát triển...</p>
+                      </div>
                     </div>
                   </CardContent>
                 </Card>
@@ -1421,7 +1712,9 @@ export default function DoctorDashboard() {
                       </p>
                     </div>
                     <div className="opacity-95 [&_button:has(svg.lucide-plus)]:hidden [&_button:has(svg.lucide-edit)]:hidden [&_button:has(svg.lucide-trash)]:hidden [&_button:has(svg.lucide-user-plus)]:hidden [&_button[aria-label*='Tạo']]:hidden [&_button[aria-label*='Thêm']]:hidden [&_button[aria-label*='Sửa']]:hidden [&_button[aria-label*='Xóa']]:hidden [&_button:contains('Tạo')]:hidden [&_button:contains('Thêm')]:hidden [&_button:contains('Sửa')]:hidden [&_button:contains('Xóa')]:hidden">
-                      <PharmacyPage />
+                      <div className="p-4 bg-gray-50 rounded-lg">
+                        <p className="text-gray-600">Chức năng nhà thuốc đang được phát triển...</p>
+                      </div>
                     </div>
                   </CardContent>
                 </Card>
@@ -1444,7 +1737,9 @@ export default function DoctorDashboard() {
                       </p>
                     </div>
                     <div className="opacity-95 [&_button:has(svg.lucide-plus)]:hidden [&_button:has(svg.lucide-edit)]:hidden [&_button:has(svg.lucide-trash)]:hidden [&_button:has(svg.lucide-user-plus)]:hidden [&_button[aria-label*='Tạo']]:hidden [&_button[aria-label*='Thêm']]:hidden [&_button[aria-label*='Sửa']]:hidden [&_button[aria-label*='Xóa']]:hidden [&_button:contains('Tạo')]:hidden [&_button:contains('Thêm')]:hidden [&_button:contains('Sửa')]:hidden [&_button:contains('Xóa')]:hidden">
-                      <BloodBankPage />
+                      <div className="p-4 bg-gray-50 rounded-lg">
+                        <p className="text-gray-600">Chức năng ngân hàng máu đang được phát triển...</p>
+                      </div>
                     </div>
                   </CardContent>
                 </Card>
@@ -1467,7 +1762,9 @@ export default function DoctorDashboard() {
                       </p>
                     </div>
                     <div className="opacity-95 [&_button:has(svg.lucide-plus)]:hidden [&_button:has(svg.lucide-edit)]:hidden [&_button:has(svg.lucide-trash)]:hidden [&_button:has(svg.lucide-user-plus)]:hidden [&_button[aria-label*='Tạo']]:hidden [&_button[aria-label*='Thêm']]:hidden [&_button[aria-label*='Sửa']]:hidden [&_button[aria-label*='Xóa']]:hidden [&_button:contains('Tạo')]:hidden [&_button:contains('Thêm')]:hidden [&_button:contains('Sửa')]:hidden [&_button:contains('Xóa')]:hidden">
-                      <RoomsPage />
+                      <div className="p-4 bg-gray-50 rounded-lg">
+                        <p className="text-gray-600">Chức năng quản lý phòng đang được phát triển...</p>
+                      </div>
                     </div>
                   </CardContent>
                 </Card>
@@ -1490,7 +1787,9 @@ export default function DoctorDashboard() {
                       </p>
                     </div>
                     <div className="opacity-95 [&_button:has(svg.lucide-plus)]:hidden [&_button:has(svg.lucide-edit)]:hidden [&_button:has(svg.lucide-trash)]:hidden [&_button:has(svg.lucide-user-plus)]:hidden [&_button[aria-label*='Tạo']]:hidden [&_button[aria-label*='Thêm']]:hidden [&_button[aria-label*='Sửa']]:hidden [&_button[aria-label*='Xóa']]:hidden [&_button:contains('Tạo')]:hidden [&_button:contains('Thêm')]:hidden [&_button:contains('Sửa')]:hidden [&_button:contains('Xóa')]:hidden">
-                      <RoomAssignmentsPage />
+                      <div className="p-4 bg-gray-50 rounded-lg">
+                        <p className="text-gray-600">Chức năng phân công phòng đang được phát triển...</p>
+                      </div>
                     </div>
                   </CardContent>
                 </Card>

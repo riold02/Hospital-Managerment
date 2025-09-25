@@ -127,6 +127,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setIsDemo(true)
           const primaryRole = (userData.roles?.[0] || userData.role || "patient").toLowerCase()
           localStorage.setItem("user_role", primaryRole)
+          
+          // Auto-redirect for demo users based on role
+          const roleRoutes: Record<string, string> = {
+            admin: "/dashboard",
+            doctor: "/dashboard/doctor",
+            nurse: "/dashboard/nurse", 
+            patient: "/dashboard/patient",
+            pharmacist: "/dashboard/pharmacist",
+            technician: "/dashboard/technician",
+            "lab assistant": "/dashboard/lab",
+            driver: "/dashboard/driver",
+            worker: "/dashboard/worker",
+          }
+          
+          const redirectPath = roleRoutes[primaryRole] || "/dashboard/patient"
+          setTimeout(() => router.push(redirectPath), 100)
         }
       } else {
         // For real users, always call /auth/me to get fresh data from backend
@@ -139,6 +155,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           localStorage.setItem("user_role", primaryRole)
           localStorage.setItem("user_info", JSON.stringify(userData))
           console.log("Real user logged in:", userData)
+          
+          // Auto-redirect for real users based on role
+          const roleRoutes: Record<string, string> = {
+            admin: "/dashboard",
+            doctor: "/dashboard/doctor",
+            nurse: "/dashboard/nurse",
+            patient: "/dashboard/patient",
+            pharmacist: "/dashboard/pharmacist",
+            technician: "/dashboard/technician",
+            "lab assistant": "/dashboard/lab",
+            driver: "/dashboard/driver",
+            worker: "/dashboard/worker",
+          }
+          
+          const redirectPath = roleRoutes[primaryRole] || "/dashboard/patient"
+          setTimeout(() => router.push(redirectPath), 100)
         }
       }
     } catch (error) {

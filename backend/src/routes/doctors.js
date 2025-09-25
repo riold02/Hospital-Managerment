@@ -208,6 +208,27 @@ router.get('/stats', doctorController.getDoctorStats);
 
 /**
  * @swagger
+ * /api/v1/doctors/by-user/{userId}:
+ *   get:
+ *     summary: Get doctor by user ID
+ *     tags: [Doctors]
+ *     parameters:
+ *       - in: path
+ *         name: userId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: User ID
+ *     responses:
+ *       200:
+ *         description: Doctor details for the user
+ *       404:
+ *         description: Doctor not found for this user
+ */
+router.get('/by-user/:userId', doctorController.getDoctorByUserId);
+
+/**
+ * @swagger
  * /api/v1/doctors/specialty/{specialty}:
  *   get:
  *     summary: Get doctors by specialty

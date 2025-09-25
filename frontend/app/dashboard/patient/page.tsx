@@ -40,6 +40,7 @@ import {
 import { useToast } from "@/hooks/use-toast"
 import { useAuth } from "@/lib/auth-context"
 import { apiClient, ApiError } from "@/lib/api-client"
+import { useRouter } from "next/navigation"
 import PatientOverview from "@/components/patient/PatientOverview"
 
 interface Appointment {
@@ -107,6 +108,7 @@ interface PatientProfile {
 }
 
 export default function PatientDashboard() {
+  const router = useRouter()
   const [activeTab, setActiveTab] = useState("overview")
   const [appointments, setAppointments] = useState<Appointment[]>([])
   const [prescriptions, setPrescriptions] = useState<Prescription[]>([])
@@ -188,6 +190,16 @@ export default function PatientDashboard() {
     }
     return '0'
   }
+
+  // Role protection - only allow patients to access this dashboard
+  useEffect(() => {
+    if (user && user.role?.toLowerCase() !== 'patient') {
+      // Redirect non-patients to their appropriate dashboard
+      const userRole = user.role?.toLowerCase()
+      router.push(`/dashboard/${userRole}`)
+      return
+    }
+  }, [user, router])
 
   useEffect(() => {
     const fetchData = async () => {

@@ -221,6 +221,33 @@ class DoctorController {
     }
   }
 
+  // Get doctor by user ID
+  async getDoctorByUserId(req, res) {
+    try {
+      const { userId } = req.params;
+
+      const data = await prisma.doctors.findFirst({
+        where: { user_id: userId },
+        include: { doctor_department: { include: { departments: true } } }
+      });
+
+      if (!data) {
+        return res.status(404).json({ success: false, error: 'Doctor not found for this user' });
+      }
+
+      res.json({
+        success: true,
+        data
+      });
+    } catch (error) {
+      console.error('Get doctor by user ID error:', error);
+      res.status(400).json({
+        success: false,
+        error: error.message
+      });
+    }
+  }
+
   // Get doctor statistics
   async getDoctorStats(req, res) {
     try {

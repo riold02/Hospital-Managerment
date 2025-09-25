@@ -120,19 +120,9 @@ export default function AuthPage() {
               localStorage.removeItem("user_role")
 
               await login(response.token)
-
-              // Get user role from response to redirect appropriately
-              const userRole = response.user?.role?.toLowerCase() || "patient"
-
-              console.log("Redirecting user with role:", userRole)
-
-              if (userRole === "patient") {
-                router.push("/dashboard/patient")
-              } else if (userRole === "admin") {
-                router.push("/dashboard/admin")
-              } else {
-                router.push("/dashboard")
-              }
+              
+              // The login function in auth-context now handles automatic redirection
+              // based on user role, so we don't need manual redirect here
             } catch (apiError) {
               console.error("API authentication failed:", apiError)
               setErrors({ email: "Tài khoản không tồn tại hoặc mật khẩu không đúng." })
@@ -153,7 +143,7 @@ export default function AuthPage() {
             )
 
             await login(response.token)
-            router.push("/dashboard/patient")
+            // Auto-redirect handled by login function based on user role
           } catch (error) {
             console.error("Registration error:", error)
             setErrors({ email: "Đăng ký thất bại, vui lòng thử lại." })
@@ -198,20 +188,9 @@ export default function AuthPage() {
 
       // Set demo user directly without API call
       await login(demoToken)
-
-      const roleRoutes: Record<string, string> = {
-        Admin: "/dashboard/admin",
-        Doctor: "/dashboard/doctor",
-        Nurse: "/dashboard/nurse",
-        Patient: "/dashboard/patient",
-        Pharmacist: "/dashboard/pharmacist",
-        Technician: "/dashboard/technician",
-        "Lab Assistant": "/dashboard/lab",
-        Driver: "/dashboard/driver",
-        Worker: "/dashboard/worker",
-      }
-
-      router.push(roleRoutes[account.role] || "/dashboard")
+      
+      // The login function in auth-context now handles automatic redirection
+      // based on user role, so we don't need manual redirect here
     } catch (error) {
       console.error("Demo login failed:", error)
       setErrors({ email: "Đăng nhập demo thất bại. Vui lòng thử lại." })

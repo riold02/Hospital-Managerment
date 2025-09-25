@@ -33,22 +33,16 @@ export default function HospitalDashboard() {
   const router = useRouter()
   const rbac = new RBACManager()
 
-  // Auto-redirect patients to their specific dashboard
+  // Auto-redirect non-admin users to their specific dashboard
   useEffect(() => {
     if (user) {
       const userRole = user.role?.toLowerCase() || user.roles?.[0]?.toLowerCase()
       
-      // Redirect patients to their specific dashboard
-      if (userRole === 'patient') {
-        router.push('/dashboard/patient')
+      // Only admin can access main dashboard, redirect others to their role-specific dashboard
+      if (userRole !== 'admin') {
+        router.push(`/dashboard/${userRole}`)
         return
       }
-      
-      // Could add other role-specific redirects here
-      // if (userRole === 'doctor') {
-      //   router.push('/dashboard/doctor')
-      //   return
-      // }
     }
   }, [user, router])
 
