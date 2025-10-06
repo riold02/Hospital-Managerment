@@ -2,6 +2,240 @@ const { prisma } = require('../config/prisma');
 const { validationResult } = require('express-validator');
 
 class AmbulanceController {
+  // Get driver dashboard overview
+  async getDriverDashboard(req, res) {
+    try {
+      const [
+        activeTransports,
+        completedToday,
+        scheduledTransports,
+        ambulanceStatus,
+        recentActivities
+      ] = await Promise.all([
+        // Active transports (In Progress logs)
+        prisma.ambulance_log.count({
+          where: { status: 'In Progress' }
+        }),
+        
+        // Completed transports today
+        prisma.ambulance_log.count({
+          where: {
+            status: 'Completed',
+            dropoff_time: {
+              gte: new Date(new Date().setHours(0, 0, 0, 0)),
+              lt: new Date(new Date().setHours(23, 59, 59, 999))
+            }
+          }
+        }),
+        
+        // Scheduled transports (emergency appointments)
+        prisma.appointment.count({
+          where: {
+            status: 'Scheduled',
+            appointment_type: 'Emergency',
+            appointment_date: {
+              gte: new Date(),
+              lt: new Date(Date.now() + 24 * 60 * 60 * 1000)
+            }
+          }
+        }),
+        
+        // Ambulance fleet status
+        prisma.ambulance.findMany({
+          select: {
+            ambulance_id: true,
+            ambulance_number: true,
+            availability: true
+          }
+        }),
+        
+        // Recent transport activities
+        prisma.ambulance_log.findMany({
+          take: 10,
+          orderBy: { pickup_time: 'desc' },
+          include: {
+            ambulance: {
+              select: {
+                ambulance_number: true
+              }
+            },
+            patient: {
+              select: {
+                first_name: true,
+                last_name: true,
+                phone_number: true
+              }
+            }
+          }
+        })
+      ]);
+
+      const dashboardData = {
+        overview: {
+          activeTransports,
+          completedToday,
+          scheduledTransports,
+          availableAmbulances: ambulanceStatus.filter(amb => amb.availability === 'Available').length,
+          totalAmbulances: ambulanceStatus.length
+        },
+        ambulanceStatus,
+        recentActivities
+      };
+
+      res.json({
+        success: true,
+        data: dashboardData
+      });
+    } catch (error) {
+      console.error('Error fetching driver dashboard:', error);
+      res.status(500).json({
+        success: false,
+        error: 'Failed to fetch driver dashboard data'
+      });
+    }
+  }
+
+  // Get emergency dispatch requests
+  async getEmergencyDispatches(req, res) {
+    try {
+      const { status = 'pending' } = req.query;
+
+      // Get emergency appointments as dispatch requests
+      const dispatches = await prisma.appointment.findMany({
+        where: {
+          appointment_type: 'Emergency',
+          ...(status === 'pending' && { status: 'Scheduled' }),
+          ...(status === 'active' && { status: 'In Progress' }),
+          ...(status === 'completed' && { status: 'Completed' })
+        },
+        include: {
+          patient: {
+            select: {
+              patient_id: true,
+              first_name: true,
+              last_name: true,
+              phone_number: true,
+              emergency_contact_name: true,
+              emergency_contact_phone: true,
+              address: true
+            }
+          }
+        },
+        orderBy: { created_at: 'desc' }
+      });
+
+      res.json({
+        success: true,
+        data: dispatches
+      });
+    } catch (error) {
+      console.error('Error fetching emergency dispatches:', error);
+      res.status(500).json({
+        success: false,
+        error: 'Failed to fetch emergency dispatches'
+      });
+    }
+  }
+
+  // Accept dispatch assignment
+  async acceptDispatch(req, res) {
+    try {
+      const { dispatchId } = req.params;
+      const { ambulance_id, estimated_arrival } = req.body;
+
+      // Update appointment to show driver accepted
+      const updatedDispatch = await prisma.appointment.update({
+        where: { appointment_id: parseInt(dispatchId) },
+        data: {
+          status: 'In Progress',
+          notes: `Ambulance ${ambulance_id} dispatched - Driver: ${req.user.user_id} - ETA: ${estimated_arrival}`,
+          updated_at: new Date()
+        },
+        include: {
+          patient: {
+            select: {
+              first_name: true,
+              last_name: true,
+              phone_number: true,
+              address: true
+            }
+          }
+        }
+      });
+
+      // Update ambulance status
+      await prisma.ambulance.update({
+        where: { ambulance_id: parseInt(ambulance_id) },
+        data: { availability: 'On Duty' }
+      });
+
+      res.json({
+        success: true,
+        data: updatedDispatch,
+        message: 'Dispatch accepted successfully'
+      });
+    } catch (error) {
+      console.error('Error accepting dispatch:', error);
+      res.status(500).json({
+        success: false,
+        error: 'Failed to accept dispatch'
+      });
+    }
+  }
+
+  // Update transport status
+  async updateTransportStatus(req, res) {
+    try {
+      const { transportId } = req.params;
+      const { 
+        status, 
+        current_location, 
+        patient_condition, 
+        estimated_arrival, 
+        notes 
+      } = req.body;
+
+      const transport = await prisma.ambulance_log.findUnique({
+        where: { log_id: parseInt(transportId) }
+      });
+
+      if (!transport) {
+        return res.status(404).json({
+          success: false,
+          error: 'Transport not found'
+        });
+      }
+
+      const updatedTransport = await prisma.ambulance_log.update({
+        where: { log_id: parseInt(transportId) },
+        data: {
+          status: status === 'arrived' ? 'Completed' : 'In Progress',
+          dropoff_time: status === 'arrived' ? new Date() : null,
+          updated_at: new Date()
+        }
+      });
+
+      // If completed, make ambulance available
+      if (status === 'arrived') {
+        await prisma.ambulance.update({
+          where: { ambulance_id: transport.ambulance_id },
+          data: { availability: 'Available' }
+        });
+      }
+
+      res.json({
+        success: true,
+        data: updatedTransport,
+        message: 'Transport status updated successfully'
+      });
+    } catch (error) {
+      console.error('Error updating transport status:', error);
+      res.status(500).json({
+        success: false,
+        error: 'Failed to update transport status'
+      });
+    }
+  }
   // Create ambulance
   async createAmbulance(req, res) {
     try {

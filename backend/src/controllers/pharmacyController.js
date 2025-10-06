@@ -2,6 +2,308 @@ const { prisma } = require('../config/prisma');
 const { validationResult } = require('express-validator');
 
 class PharmacyController {
+  // Get pharmacist dashboard overview
+  async getPharmacistDashboard(req, res) {
+    try {
+      const [
+        pendingPrescriptions,
+        lowStockMedicines,
+        todayDispensed,
+        totalMedicines,
+        expiringMedicines,
+        recentPrescriptions
+      ] = await Promise.all([
+        // Pending prescriptions to dispense
+        prisma.prescription.count({
+          where: {
+            pharmacy_records: {
+              none: {}
+            }
+          }
+        }),
+        
+        // Low stock medicines (stock < 10)
+        prisma.medicine.count({
+          where: {
+            stock_quantity: {
+              lt: 10
+            }
+          }
+        }),
+        
+        // Today's dispensed medications
+        prisma.pharmacy.count({
+          where: {
+            dispensed_date: {
+              gte: new Date(new Date().setHours(0, 0, 0, 0)),
+              lt: new Date(new Date().setHours(23, 59, 59, 999))
+            }
+          }
+        }),
+        
+        // Total medicines in inventory
+        prisma.medicine.count(),
+        
+        // Medicines expiring in next 30 days
+        prisma.medicine.count({
+          where: {
+            expiry_date: {
+              lte: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
+            }
+          }
+        }),
+        
+        // Recent prescriptions
+        prisma.prescription.findMany({
+          take: 10,
+          orderBy: { created_at: 'desc' },
+          include: {
+            appointment: {
+              include: {
+                patient: {
+                  select: {
+                    first_name: true,
+                    last_name: true
+                  }
+                },
+                doctor: {
+                  select: {
+                    first_name: true,
+                    last_name: true
+                  }
+                }
+              }
+            },
+            prescription_items: {
+              include: {
+                medicine: true
+              }
+            }
+          }
+        })
+      ]);
+
+      const dashboardData = {
+        overview: {
+          pendingPrescriptions,
+          lowStockMedicines,
+          todayDispensed,
+          totalMedicines,
+          expiringMedicines
+        },
+        recentPrescriptions
+      };
+
+      res.json({
+        success: true,
+        data: dashboardData
+      });
+    } catch (error) {
+      console.error('Error fetching pharmacist dashboard:', error);
+      res.status(500).json({
+        success: false,
+        error: 'Failed to fetch pharmacist dashboard data'
+      });
+    }
+  }
+
+  // Get pending prescriptions
+  async getPendingPrescriptions(req, res) {
+    try {
+      const { page = 1, limit = 20 } = req.query;
+      const offset = (page - 1) * limit;
+
+      const [prescriptions, total] = await Promise.all([
+        prisma.prescription.findMany({
+          where: {
+            pharmacy_records: {
+              none: {}
+            }
+          },
+          include: {
+            appointment: {
+              include: {
+                patient: {
+                  select: {
+                    patient_id: true,
+                    first_name: true,
+                    last_name: true,
+                    date_of_birth: true,
+                    phone_number: true
+                  }
+                },
+                doctor: {
+                  select: {
+                    first_name: true,
+                    last_name: true,
+                    specialty: true
+                  }
+                }
+              }
+            },
+            prescription_items: {
+              include: {
+                medicine: {
+                  select: {
+                    medicine_id: true,
+                    name: true,
+                    dosage: true,
+                    unit: true,
+                    stock_quantity: true
+                  }
+                }
+              }
+            }
+          },
+          orderBy: { created_at: 'asc' },
+          skip: parseInt(offset),
+          take: parseInt(limit)
+        }),
+        prisma.prescription.count({
+          where: {
+            pharmacy_records: {
+              none: {}
+            }
+          }
+        })
+      ]);
+
+      res.json({
+        success: true,
+        data: prescriptions,
+        pagination: {
+          page: parseInt(page),
+          limit: parseInt(limit),
+          total,
+          pages: Math.ceil(total / limit),
+          hasNext: page * limit < total,
+          hasPrev: page > 1
+        }
+      });
+    } catch (error) {
+      console.error('Error fetching pending prescriptions:', error);
+      res.status(500).json({
+        success: false,
+        error: 'Failed to fetch pending prescriptions'
+      });
+    }
+  }
+
+  // Get medicine inventory with enhanced filtering
+  async getMedicineInventory(req, res) {
+    try {
+      const { page = 1, limit = 20, search, category, lowStock } = req.query;
+      const offset = (page - 1) * limit;
+
+      const whereClause = {};
+      
+      if (search) {
+        whereClause.name = {
+          contains: search,
+          mode: 'insensitive'
+        };
+      }
+      
+      if (category) {
+        whereClause.category = category;
+      }
+      
+      if (lowStock === 'true') {
+        whereClause.stock_quantity = {
+          lt: 10
+        };
+      }
+
+      const [medicines, total] = await Promise.all([
+        prisma.medicine.findMany({
+          where: whereClause,
+          orderBy: { name: 'asc' },
+          skip: parseInt(offset),
+          take: parseInt(limit)
+        }),
+        prisma.medicine.count({ where: whereClause })
+      ]);
+
+      res.json({
+        success: true,
+        data: medicines,
+        pagination: {
+          page: parseInt(page),
+          limit: parseInt(limit),
+          total,
+          pages: Math.ceil(total / limit),
+          hasNext: page * limit < total,
+          hasPrev: page > 1
+        }
+      });
+    } catch (error) {
+      console.error('Error fetching medicine inventory:', error);
+      res.status(500).json({
+        success: false,
+        error: 'Failed to fetch medicine inventory'
+      });
+    }
+  }
+
+  // Update medicine stock
+  async updateMedicineStock(req, res) {
+    try {
+      const { medicineId } = req.params;
+      const { stock_quantity, expiry_date, batch_number } = req.body;
+
+      const medicine = await prisma.medicine.update({
+        where: { medicine_id: parseInt(medicineId) },
+        data: {
+          stock_quantity: parseInt(stock_quantity),
+          expiry_date: expiry_date ? new Date(expiry_date) : undefined,
+          updated_at: new Date()
+        }
+      });
+
+      res.json({
+        success: true,
+        data: medicine,
+        message: 'Medicine stock updated successfully'
+      });
+    } catch (error) {
+      console.error('Error updating medicine stock:', error);
+      res.status(500).json({
+        success: false,
+        error: 'Failed to update medicine stock'
+      });
+    }
+  }
+
+  // Get expiring medicines
+  async getExpiringMedicines(req, res) {
+    try {
+      const { days = 30 } = req.query;
+      const expiryDate = new Date(Date.now() + parseInt(days) * 24 * 60 * 60 * 1000);
+
+      const medicines = await prisma.medicine.findMany({
+        where: {
+          expiry_date: {
+            lte: expiryDate
+          },
+          stock_quantity: {
+            gt: 0
+          }
+        },
+        orderBy: { expiry_date: 'asc' }
+      });
+
+      res.json({
+        success: true,
+        data: medicines
+      });
+    } catch (error) {
+      console.error('Error fetching expiring medicines:', error);
+      res.status(500).json({
+        success: false,
+        error: 'Failed to fetch expiring medicines'
+      });
+    }
+  }
   // Dispense medicine (create pharmacy record)
   async dispenseMedicine(req, res) {
     try {

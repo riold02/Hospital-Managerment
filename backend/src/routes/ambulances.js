@@ -2,7 +2,114 @@ const express = require('express');
 const router = express.Router();
 const { AmbulanceController } = require('../controllers/ambulanceController');
 const { validateAmbulance, validateAmbulanceUpdate } = require('../middleware/validation');
-const { authenticateToken, requireStaff, requireAdmin } = require('../middleware/auth');
+const { authenticateToken, requireStaff, requireAdmin, requireRole } = require('../middleware/auth');
+
+// Driver Dashboard Routes
+/**
+ * @swagger
+ * /api/v1/ambulances/driver/dashboard:
+ *   get:
+ *     summary: Get driver dashboard overview
+ *     tags: [Ambulances]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Driver dashboard data retrieved successfully
+ */
+router.get('/driver/dashboard', authenticateToken, requireRole(['driver', 'admin']), AmbulanceController.getDriverDashboard);
+
+/**
+ * @swagger
+ * /api/v1/ambulances/emergency-dispatches:
+ *   get:
+ *     summary: Get emergency dispatch requests
+ *     tags: [Ambulances]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: status
+ *         schema:
+ *           type: string
+ *           enum: [pending, active, completed]
+ *         description: Filter by dispatch status
+ *     responses:
+ *       200:
+ *         description: Emergency dispatches retrieved successfully
+ */
+router.get('/emergency-dispatches', authenticateToken, requireRole(['driver', 'admin']), AmbulanceController.getEmergencyDispatches);
+
+/**
+ * @swagger
+ * /api/v1/ambulances/dispatches/{dispatchId}/accept:
+ *   post:
+ *     summary: Accept dispatch assignment
+ *     tags: [Ambulances]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: dispatchId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: Dispatch ID
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               ambulance_id:
+ *                 type: string
+ *               estimated_arrival:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Dispatch accepted successfully
+ */
+router.post('/dispatches/:dispatchId/accept', authenticateToken, requireRole(['driver', 'admin']), AmbulanceController.acceptDispatch);
+
+/**
+ * @swagger
+ * /api/v1/ambulances/transports/{transportId}/status:
+ *   put:
+ *     summary: Update transport status
+ *     tags: [Ambulances]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: transportId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: Transport ID
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               status:
+ *                 type: string
+ *                 enum: [en_route, arrived, completed]
+ *               current_location:
+ *                 type: string
+ *               patient_condition:
+ *                 type: string
+ *               estimated_arrival:
+ *                 type: string
+ *               notes:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Transport status updated successfully
+ */
+router.put('/transports/:transportId/status', authenticateToken, requireRole(['driver', 'admin']), AmbulanceController.updateTransportStatus);
 
 /**
  * @swagger

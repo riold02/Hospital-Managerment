@@ -1,494 +1,655 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import DashboardLayout from "@/components/layout/DashboardLayout"
+import { toast } from "@/hooks/use-toast"
 import {
-  Calendar,
+  Shield,
   Users,
-  DollarSign,
-  AlertTriangle,
-  Building2,
-  Pill,
-  Droplets,
-  Truck,
-  Loader2,
-  Search,
-  Filter,
-  FileText,
-  Stethoscope,
-  ClipboardList,
-  BedDouble,
-  Sparkles,
-  Newspaper,
-  HelpCircle,
   Activity,
-  UserCog,
+  Settings,
+  BarChart3,
+  Database,
+  AlertTriangle,
+  CheckCircle,
+  Clock,
+  Server,
+  HardDrive,
+  LogOut,
+  User,
+  Home,
+  FileText,
+  Download,
+  Wrench
 } from "lucide-react"
-import Link from "next/link"
-
-interface KPIData {
-  todayAppointments: number
-  roomOccupancy: number
-  monthlyRevenue: number
-  expiringMedicine: number
-}
-
-interface BillingItem {
-  bill_id: string
-  patient: string
-  amount: number
-  created_at: string
-}
-
-interface RoomItem {
-  room_number: string
-  type: string
-  status: string
-  last_serviced: string
-}
+import { useAuth } from "@/lib/auth-context"
+import { adminApi, AdminDashboardData, UserData, ActivityLog, SystemStatistics } from "@/lib/api"
+import { useRouter } from "next/navigation"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 
 export default function AdminDashboard() {
-  const [kpiData, setKpiData] = useState<KPIData | null>(null)
-  const [billingData, setBillingData] = useState<BillingItem[]>([])
-  const [roomData, setRoomData] = useState<RoomItem[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-  const [dateFilter, setDateFilter] = useState(new Date().toISOString().split("T")[0])
-  const [searchTerm, setSearchTerm] = useState("")
+  const { user, logout } = useAuth()
+  const router = useRouter()
+  const [activeTab, setActiveTab] = useState("overview")
+  const [loading, setLoading] = useState(false)
+  
+  // Dashboard Data States
+  const [dashboardData, setDashboardData] = useState<AdminDashboardData | null>(null)
+  const [systemStats, setSystemStats] = useState<SystemStatistics | null>(null)
+  const [users, setUsers] = useState<UserData[]>([])
+  const [activityLogs, setActivityLogs] = useState<ActivityLog[]>([])
+  
+  // Filters
+  const [userFilter, setUserFilter] = useState("")
+  const [statusFilter, setStatusFilter] = useState("")
 
-  // Mock data for demonstration
   useEffect(() => {
-    const fetchData = async () => {
-      try {
-        console.log("[v0] Loading admin dashboard data")
-        setLoading(true)
-
-        // Simulate API calls
-        await new Promise((resolve) => setTimeout(resolve, 1000))
-
-        // Mock KPI data
-        setKpiData({
-          todayAppointments: 24,
-          roomOccupancy: 78,
-          monthlyRevenue: 2450000,
-          expiringMedicine: 12,
-        })
-
-        // Mock billing data
-        setBillingData([
-          { bill_id: "BL001", patient: "Nguyễn Văn An", amount: 850000, created_at: "2024-01-15" },
-          { bill_id: "BL002", patient: "Trần Thị Bình", amount: 1200000, created_at: "2024-01-14" },
-          { bill_id: "BL003", patient: "Lê Văn Cường", amount: 650000, created_at: "2024-01-13" },
-          { bill_id: "BL004", patient: "Phạm Thị Dung", amount: 950000, created_at: "2024-01-12" },
-        ])
-
-        // Mock room data
-        setRoomData([
-          { room_number: "P101", type: "Phòng đơn", status: "Occupied", last_serviced: "2024-01-10" },
-          { room_number: "P205", type: "Phòng ICU", status: "Under Maintenance", last_serviced: "2024-01-08" },
-          { room_number: "P312", type: "Phòng đôi", status: "Occupied", last_serviced: "2024-01-09" },
-        ])
-
-        setLoading(false)
-      } catch (err) {
-        setError("Không thể tải dữ liệu. Vui lòng thử lại.")
-        setLoading(false)
-      }
+    if (user) {
+      loadDashboardData()
     }
+  }, [user])
 
-    fetchData()
-  }, [dateFilter])
-
-  const handleMarkPaid = async (billId: string) => {
+  const loadDashboardData = async () => {
+    setLoading(true)
+    console.log('Loading admin dashboard data for user:', user)
+    
     try {
-      // Simulate API call: PUT /billing/{id}
-      console.log(`[v0] Marking bill ${billId} as paid`)
-      setBillingData((prev) => prev.filter((item) => item.bill_id !== billId))
-    } catch (err) {
-      console.error("Error marking bill as paid:", err)
+      // Load admin dashboard data
+      const dashboardResponse = await adminApi.getDashboard()
+      console.log('Admin Dashboard API Response:', dashboardResponse)
+      setDashboardData(dashboardResponse)
+
+      // Load system statistics
+      const statsResponse = await adminApi.getSystemStatistics()
+      console.log('System Statistics API Response:', statsResponse)
+      setSystemStats(statsResponse)
+
+      // Load users
+      const usersResponse = await adminApi.getAllUsers({ limit: 50 })
+      console.log('Users API Response:', usersResponse)
+      setUsers(usersResponse.data)
+
+      // Load activity logs
+      const logsResponse = await adminApi.getActivityLogs({ limit: 20 })
+      console.log('Activity Logs API Response:', logsResponse)
+      setActivityLogs(logsResponse.data)
+
+      console.log('Admin dashboard data loaded successfully')
+
+    } catch (error) {
+      console.error("Error loading admin dashboard data:", error)
+      toast({
+        title: "Lỗi",
+        description: "Không thể tải dữ liệu dashboard",
+        variant: "destructive",
+      })
+    } finally {
+      setLoading(false)
     }
   }
 
-  const handleSetAvailable = async (roomNumber: string) => {
+  const handleToggleUserStatus = async (userId: string, currentStatus: boolean) => {
     try {
-      // Simulate API call: PUT /rooms/{id}
-      console.log(`[v0] Setting room ${roomNumber} as available`)
-      setRoomData((prev) => prev.filter((item) => item.room_number !== roomNumber))
-    } catch (err) {
-      console.error("Error setting room as available:", err)
+      await adminApi.updateUserStatus(userId, { is_active: !currentStatus })
+      
+      toast({
+        title: "Thành công",
+        description: `Đã ${!currentStatus ? 'kích hoạt' : 'vô hiệu hóa'} tài khoản`,
+      })
+      
+      loadDashboardData()
+
+    } catch (error) {
+      console.error("Error updating user status:", error)
+      toast({
+        title: "Lỗi",
+        description: "Không thể cập nhật trạng thái tài khoản",
+        variant: "destructive",
+      })
     }
   }
 
-  const filteredBilling = billingData.filter(
-    (item) =>
-      item.patient.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      item.bill_id.toLowerCase().includes(searchTerm.toLowerCase()),
-  )
+  const handleCreateBackup = async () => {
+    try {
+      await adminApi.createBackup({ backup_type: 'full' })
+      
+      toast({
+        title: "Thành công",
+        description: "Đã tạo backup hệ thống thành công",
+      })
 
-  const filteredRooms = roomData.filter(
-    (item) =>
-      item.room_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      item.type.toLowerCase().includes(searchTerm.toLowerCase()),
-  )
+    } catch (error) {
+      console.error("Error creating backup:", error)
+      toast({
+        title: "Lỗi",
+        description: "Không thể tạo backup hệ thống",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const handleToggleMaintenanceMode = async (enabled: boolean) => {
+    try {
+      await adminApi.toggleMaintenanceMode({ 
+        enabled,
+        message: enabled ? 'Hệ thống đang bảo trì, vui lòng quay lại sau' : ''
+      })
+      
+      toast({
+        title: "Thành công",
+        description: `Đã ${enabled ? 'bật' : 'tắt'} chế độ bảo trì`,
+      })
+
+    } catch (error) {
+      console.error("Error toggling maintenance mode:", error)
+      toast({
+        title: "Lỗi",
+        description: "Không thể thay đổi chế độ bảo trì",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const handleLogout = async () => {
+    try {
+      await logout()
+      router.push('/auth')
+    } catch (error) {
+      console.error('Logout error:', error)
+    }
+  }
+
+  const filteredUsers = users.filter(user => {
+    const matchesEmail = user.email.toLowerCase().includes(userFilter.toLowerCase())
+    const matchesStatus = statusFilter === "" || 
+      (statusFilter === "active" && user.is_active) ||
+      (statusFilter === "inactive" && !user.is_active)
+    return matchesEmail && matchesStatus
+  })
 
   if (loading) {
     return (
-      <DashboardLayout
-        title="Bảng Điều Khiển Quản Trị"
-        description="Tổng quan hệ thống bệnh viện"
-        currentPath="/dashboard/admin"
-      >
-        <div className="flex items-center justify-center min-h-[400px]">
-          <div className="text-center">
-            <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4" />
-            <p className="text-muted-foreground">Đang tải dữ liệu...</p>
-          </div>
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-muted-foreground">Đang tải dashboard...</p>
         </div>
-      </DashboardLayout>
-    )
-  }
-
-  if (error) {
-    return (
-      <DashboardLayout
-        title="Bảng Điều Khiển Quản Trị"
-        description="Tổng quan hệ thống bệnh viện"
-        currentPath="/dashboard/admin"
-      >
-        <div className="flex items-center justify-center min-h-[400px]">
-          <div className="text-center">
-            <AlertTriangle className="h-8 w-8 text-destructive mx-auto mb-4" />
-            <p className="text-destructive mb-4">{error}</p>
-            <Button onClick={() => window.location.reload()}>Thử lại</Button>
-          </div>
-        </div>
-      </DashboardLayout>
+      </div>
     )
   }
 
   return (
-    <DashboardLayout
-      title="Bảng Điều Khiển Quản Trị"
-      description="Tổng quan hệ thống bệnh viện"
-      currentPath="/dashboard/admin"
-    >
-      {/* Date Filter */}
-      <div className="flex items-center justify-end gap-4 mb-6">
-        <div className="flex items-center gap-2">
-          <Calendar className="h-4 w-4" />
-          <Input type="date" value={dateFilter} onChange={(e) => setDateFilter(e.target.value)} className="w-auto" />
+    <div className="flex h-screen bg-gray-50">
+      {/* Sidebar */}
+      <div className="w-64 bg-white shadow-lg border-r border-gray-200 flex flex-col">
+        {/* Header */}
+        <div className="p-6 border-b border-gray-200">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-gradient-to-r from-red-500 to-red-600 rounded-lg flex items-center justify-center">
+              <Shield className="h-6 w-6 text-white" />
+            </div>
+            <div>
+              <h1 className="text-lg font-bold text-gray-900">Dashboard Quản trị</h1>
+              <p className="text-sm text-gray-500">
+                {user?.full_name || user?.email || "Quản trị viên"}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Navigation Menu */}
+        <nav className="flex-1 p-4 space-y-2">
+          {[
+            { value: "overview", label: "Tổng quan", icon: Home },
+            { value: "users", label: "Người dùng", icon: Users, badge: users.length },
+            { value: "system", label: "Hệ thống", icon: Server },
+            { value: "activity", label: "Hoạt động", icon: Activity, badge: activityLogs.length },
+            { value: "backup", label: "Sao lưu", icon: Database },
+            { value: "maintenance", label: "Bảo trì", icon: Wrench },
+          ].map((tab) => {
+            const Icon = tab.icon
+            const isActive = activeTab === tab.value
+
+            return (
+              <button
+                key={tab.value}
+                onClick={() => setActiveTab(tab.value)}
+                className={`
+                  w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium text-sm
+                  transition-all duration-200 ease-in-out
+                  ${
+                    isActive
+                      ? "bg-gradient-to-r from-red-500 to-red-600 text-white shadow-lg"
+                      : "text-gray-600 hover:text-red-600 hover:bg-red-50"
+                  }
+                `}
+              >
+                <Icon className={`h-5 w-5 ${isActive ? "text-white" : ""}`} />
+                <span className="flex-1 text-left">{tab.label}</span>
+                {tab.badge && tab.badge > 0 && (
+                  <span
+                    className={`
+                    min-w-5 h-5 rounded-full text-xs font-bold
+                    flex items-center justify-center
+                    ${isActive ? "bg-white text-red-600" : "bg-blue-500 text-white"}
+                  `}
+                  >
+                    {tab.badge}
+                  </span>
+                )}
+              </button>
+            )
+          })}
+        </nav>
+
+        {/* User Info & Logout */}
+        <div className="border-t border-gray-200">
+          <div className="p-4 bg-gray-50">
+            <div className="flex items-center gap-3">
+              <Avatar className="h-8 w-8">
+                <AvatarImage src="/placeholder-user.jpg" alt="Admin Avatar" />
+                <AvatarFallback>
+                  <User className="h-4 w-4" />
+                </AvatarFallback>
+              </Avatar>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-gray-900 truncate">
+                  {user?.full_name || user?.email || "Quản trị viên"}
+                </p>
+                <p className="text-xs text-gray-500 truncate">
+                  {user?.email || "admin@hospital.vn"}
+                </p>
+                <Badge variant="destructive" className="text-xs mt-1">
+                  ADMIN
+                </Badge>
+              </div>
+            </div>
+          </div>
+          
+          <div className="p-4">
+            <button
+              onClick={handleLogout}
+              className="w-full flex items-center space-x-3 px-3 py-2 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
+            >
+              <LogOut className="h-5 w-5" />
+              <span>Đăng xuất</span>
+            </button>
+          </div>
         </div>
       </div>
 
-      {/* KPI Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Hẹn Hôm Nay</CardTitle>
-            <Calendar className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-primary">{kpiData?.todayAppointments}</div>
-            <p className="text-xs text-muted-foreground">cuộc hẹn đã đặt</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Công Suất Phòng</CardTitle>
-            <Building2 className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-primary">{kpiData?.roomOccupancy}%</div>
-            <p className="text-xs text-muted-foreground">phòng đang sử dụng</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Doanh Thu Tháng</CardTitle>
-            <DollarSign className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-primary">{kpiData?.monthlyRevenue?.toLocaleString("vi-VN")}₫</div>
-            <p className="text-xs text-muted-foreground">tháng này</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Thuốc Sắp Hết Hạn</CardTitle>
-            <AlertTriangle className="h-4 w-4 text-destructive" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-destructive">{kpiData?.expiringMedicine}</div>
-            <p className="text-xs text-muted-foreground">trong 30 ngày tới</p>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Search and Filter */}
-      <div className="flex items-center gap-4 mb-6">
-        <div className="relative flex-1 max-w-sm">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Tìm kiếm..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-10"
-          />
+      {/* Main Content */}
+      <div className="flex-1 flex flex-col">
+        {/* Top Bar */}
+        <div className="bg-white border-b border-gray-200 px-6 py-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-xl font-bold text-gray-900">
+                {activeTab === "overview" && "Tổng quan hệ thống"}
+                {activeTab === "users" && "Quản lý người dùng"}
+                {activeTab === "system" && "Thống kê hệ thống"}
+                {activeTab === "activity" && "Nhật ký hoạt động"}
+                {activeTab === "backup" && "Sao lưu dữ liệu"}
+                {activeTab === "maintenance" && "Bảo trì hệ thống"}
+              </h2>
+              <p className="text-sm text-gray-500">
+                Chào buổi {new Date().getHours() < 12 ? "sáng" : new Date().getHours() < 18 ? "chiều" : "tối"}, {" "}
+                {user?.full_name || user?.email || "Quản trị viên"}
+              </p>
+            </div>
+          </div>
         </div>
-        <Button variant="outline" size="sm">
-          <Filter className="h-4 w-4 mr-2" />
-          Lọc
-        </Button>
-      </div>
 
-      {/* Tables */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
-        {/* Billing Pending Table */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Hóa Đơn Chờ Thanh Toán</CardTitle>
-            <CardDescription>Danh sách hóa đơn chưa được thanh toán</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {filteredBilling.length === 0 ? (
-              <div className="text-center py-8">
-                <p className="text-muted-foreground">Không có hóa đơn chờ thanh toán</p>
+        {/* Content Area */}
+        <div className="flex-1 p-6">
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+            {/* Overview Tab */}
+            <TabsContent value="overview" className="space-y-6">
+              {/* KPI Cards */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                <Card className="bg-gradient-to-br from-blue-50 to-white rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1 border-0">
+                  <CardContent className="p-6">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <Users className="h-8 w-8 text-blue-600 mb-2" />
+                        <p className="text-3xl font-bold text-blue-800">
+                          {dashboardData?.overview.totalUsers || 0}
+                        </p>
+                        <p className="text-sm font-medium text-blue-600">Tổng người dùng</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card className="bg-gradient-to-br from-green-50 to-white rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1 border-0">
+                  <CardContent className="p-6">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <Activity className="h-8 w-8 text-green-600 mb-2" />
+                        <p className="text-3xl font-bold text-green-800">
+                          {dashboardData?.overview.totalAppointments || 0}
+                        </p>
+                        <p className="text-sm font-medium text-green-600">Tổng cuộc hẹn</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card className="bg-gradient-to-br from-purple-50 to-white rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1 border-0">
+                  <CardContent className="p-6">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <Settings className="h-8 w-8 text-purple-600 mb-2" />
+                        <p className="text-3xl font-bold text-purple-800">
+                          {dashboardData?.overview.totalDepartments || 0}
+                        </p>
+                        <p className="text-sm font-medium text-purple-600">Tổng khoa</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card className="bg-gradient-to-br from-orange-50 to-white rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1 border-0">
+                  <CardContent className="p-6">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <HardDrive className="h-8 w-8 text-orange-600 mb-2" />
+                        <p className="text-3xl font-bold text-orange-800">
+                          {dashboardData?.overview.totalRooms || 0}
+                        </p>
+                        <p className="text-sm font-medium text-orange-600">Tổng phòng</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
               </div>
-            ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Mã HĐ</TableHead>
-                    <TableHead>Bệnh Nhân</TableHead>
-                    <TableHead>Số Tiền</TableHead>
-                    <TableHead>Ngày Tạo</TableHead>
-                    <TableHead>Hành Động</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredBilling.map((bill) => (
-                    <TableRow key={bill.bill_id}>
-                      <TableCell className="font-medium">{bill.bill_id}</TableCell>
-                      <TableCell>{bill.patient}</TableCell>
-                      <TableCell>{bill.amount.toLocaleString("vi-VN")}₫</TableCell>
-                      <TableCell>{new Date(bill.created_at).toLocaleDateString("vi-VN")}</TableCell>
-                      <TableCell>
-                        <Button
-                          size="sm"
-                          onClick={() => handleMarkPaid(bill.bill_id)}
-                          className="bg-green-600 hover:bg-green-700"
-                        >
-                          Đánh Dấu Đã Trả
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            )}
-          </CardContent>
-        </Card>
 
-        {/* Unavailable Rooms Table */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Phòng Không Khả Dụng</CardTitle>
-            <CardDescription>Phòng đang bảo trì hoặc có người</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {filteredRooms.length === 0 ? (
-              <div className="text-center py-8">
-                <p className="text-muted-foreground">Tất cả phòng đều khả dụng</p>
+              {/* System Health */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <Server className="h-5 w-5 text-green-600" />
+                      Tình trạng hệ thống
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-medium">Database</span>
+                      <Badge variant={dashboardData?.systemHealth.database === 'healthy' ? 'default' : 'destructive'}>
+                        {dashboardData?.systemHealth.database === 'healthy' ? 'Hoạt động tốt' : 'Có vấn đề'}
+                      </Badge>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-medium">Server</span>
+                      <Badge variant={dashboardData?.systemHealth.server === 'running' ? 'default' : 'destructive'}>
+                        {dashboardData?.systemHealth.server === 'running' ? 'Đang chạy' : 'Dừng hoạt động'}
+                      </Badge>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-medium">Backup cuối</span>
+                      <span className="text-sm text-gray-500">
+                        {dashboardData?.systemHealth.lastBackup ? 
+                          new Date(dashboardData.systemHealth.lastBackup).toLocaleDateString('vi-VN') : 
+                          'Chưa có'
+                        }
+                      </span>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <Activity className="h-5 w-5 text-blue-600" />
+                      Hoạt động gần đây
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-3">
+                      {dashboardData?.recentActivities && dashboardData.recentActivities.length > 0 ? 
+                        dashboardData.recentActivities.slice(0, 5).map((activity) => (
+                          <div key={activity.user_id} className="flex items-center gap-3">
+                            <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                            <div className="flex-1">
+                              <p className="text-sm font-medium">{activity.email}</p>
+                              <p className="text-xs text-gray-500">
+                                {new Date(activity.created_at).toLocaleDateString('vi-VN')}
+                              </p>
+                            </div>
+                          </div>
+                        )) : (
+                          <p className="text-sm text-gray-500">Không có hoạt động gần đây</p>
+                        )
+                      }
+                    </div>
+                  </CardContent>
+                </Card>
               </div>
-            ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Số Phòng</TableHead>
-                    <TableHead>Loại</TableHead>
-                    <TableHead>Trạng Thái</TableHead>
-                    <TableHead>Bảo Trì Cuối</TableHead>
-                    <TableHead>Hành Động</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredRooms.map((room) => (
-                    <TableRow key={room.room_number}>
-                      <TableCell className="font-medium">{room.room_number}</TableCell>
-                      <TableCell>{room.type}</TableCell>
-                      <TableCell>
-                        <Badge variant={room.status === "Occupied" ? "destructive" : "secondary"}>
-                          {room.status === "Occupied" ? "Có Người" : "Bảo Trì"}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>{new Date(room.last_serviced).toLocaleDateString("vi-VN")}</TableCell>
-                      <TableCell>
-                        <Button size="sm" variant="outline" onClick={() => handleSetAvailable(room.room_number)}>
-                          Đặt Khả Dụng
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            )}
-          </CardContent>
-        </Card>
+            </TabsContent>
+
+            {/* Users Management Tab */}
+            <TabsContent value="users" className="space-y-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Users className="h-5 w-5 text-blue-600" />
+                    Quản lý người dùng ({filteredUsers.length})
+                  </CardTitle>
+                  <div className="flex items-center gap-4">
+                    <Input
+                      placeholder="Tìm kiếm email..."
+                      value={userFilter}
+                      onChange={(e) => setUserFilter(e.target.value)}
+                      className="max-w-sm"
+                    />
+                    <select
+                      value={statusFilter}
+                      onChange={(e) => setStatusFilter(e.target.value)}
+                      className="px-3 py-2 border rounded-md"
+                    >
+                      <option value="">Tất cả trạng thái</option>
+                      <option value="active">Đang hoạt động</option>
+                      <option value="inactive">Đã vô hiệu hóa</option>
+                    </select>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Email</TableHead>
+                          <TableHead>Trạng thái</TableHead>
+                          <TableHead>Ngày tạo</TableHead>
+                          <TableHead>Đăng nhập cuối</TableHead>
+                          <TableHead>Thao tác</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {filteredUsers.map((user) => (
+                          <TableRow key={user.user_id}>
+                            <TableCell className="font-medium">{user.email}</TableCell>
+                            <TableCell>
+                              <Badge variant={user.is_active ? "default" : "secondary"}>
+                                {user.is_active ? "Hoạt động" : "Vô hiệu"}
+                              </Badge>
+                            </TableCell>
+                            <TableCell>
+                              {new Date(user.created_at).toLocaleDateString('vi-VN')}
+                            </TableCell>
+                            <TableCell>
+                              {user.last_login ? 
+                                new Date(user.last_login).toLocaleDateString('vi-VN') : 
+                                'Chưa đăng nhập'
+                              }
+                            </TableCell>
+                            <TableCell>
+                              <Button
+                                size="sm"
+                                variant={user.is_active ? "destructive" : "default"}
+                                onClick={() => handleToggleUserStatus(user.user_id, user.is_active)}
+                              >
+                                {user.is_active ? "Vô hiệu hóa" : "Kích hoạt"}
+                              </Button>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            {/* System Statistics Tab */}
+            <TabsContent value="system" className="space-y-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <BarChart3 className="h-5 w-5 text-purple-600" />
+                    Thống kê hệ thống
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+                    <div className="text-center">
+                      <p className="text-3xl font-bold text-blue-600">{systemStats?.totalUsers || 0}</p>
+                      <p className="text-sm text-gray-600">Người dùng</p>
+                    </div>
+                    <div className="text-center">
+                      <p className="text-3xl font-bold text-green-600">{systemStats?.totalAppointments || 0}</p>
+                      <p className="text-sm text-gray-600">Cuộc hẹn</p>
+                    </div>
+                    <div className="text-center">
+                      <p className="text-3xl font-bold text-purple-600">{systemStats?.totalDepartments || 0}</p>
+                      <p className="text-sm text-gray-600">Khoa</p>
+                    </div>
+                    <div className="text-center">
+                      <p className="text-3xl font-bold text-orange-600">{systemStats?.totalRooms || 0}</p>
+                      <p className="text-sm text-gray-600">Phòng</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            {/* Activity Logs Tab */}
+            <TabsContent value="activity" className="space-y-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <FileText className="h-5 w-5 text-green-600" />
+                    Nhật ký hoạt động ({activityLogs.length})
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    {activityLogs && activityLogs.length > 0 ? activityLogs.map((log) => (
+                      <div key={log.log_id} className="p-4 rounded-lg border hover:bg-gray-50 transition-colors">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <h4 className="font-semibold">{log.action}</h4>
+                            <p className="text-sm text-muted-foreground">
+                              {log.user?.email || 'Hệ thống'} - {log.resource}
+                            </p>
+                            {log.details && (
+                              <p className="text-xs text-gray-500 mt-1">{log.details}</p>
+                            )}
+                          </div>
+                          <div className="text-right">
+                            <p className="text-xs text-gray-500">
+                              {new Date(log.timestamp).toLocaleString('vi-VN')}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    )) : (
+                      <div className="text-center py-12 text-gray-500">
+                        <Activity className="h-16 w-16 mx-auto mb-4 opacity-30" />
+                        <h3 className="text-lg font-medium mb-2">Không có nhật ký hoạt động</h3>
+                        <p>Chưa có hoạt động nào được ghi lại.</p>
+                      </div>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            {/* Backup Tab */}
+            <TabsContent value="backup" className="space-y-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Database className="h-5 w-5 text-blue-600" />
+                    Sao lưu dữ liệu
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="flex items-center gap-4">
+                    <Button onClick={handleCreateBackup} className="bg-blue-600 hover:bg-blue-700">
+                      <Download className="h-4 w-4 mr-2" />
+                      Tạo backup đầy đủ
+                    </Button>
+                    <p className="text-sm text-gray-600">
+                      Backup cuối: {dashboardData?.systemHealth.lastBackup ? 
+                        new Date(dashboardData.systemHealth.lastBackup).toLocaleString('vi-VN') : 
+                        'Chưa có'
+                      }
+                    </p>
+                  </div>
+                  <div className="p-4 bg-blue-50 rounded-lg">
+                    <p className="text-sm text-blue-800">
+                      <strong>Lưu ý:</strong> Quá trình backup có thể mất vài phút. Hệ thống sẽ tiếp tục hoạt động bình thường.
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            {/* Maintenance Tab */}
+            <TabsContent value="maintenance" className="space-y-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Wrench className="h-5 w-5 text-orange-600" />
+                    Bảo trì hệ thống
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="flex items-center gap-4">
+                    <Button 
+                      onClick={() => handleToggleMaintenanceMode(true)}
+                      variant="destructive"
+                    >
+                      <AlertTriangle className="h-4 w-4 mr-2" />
+                      Bật chế độ bảo trì
+                    </Button>
+                    <Button 
+                      onClick={() => handleToggleMaintenanceMode(false)}
+                      className="bg-green-600 hover:bg-green-700"
+                    >
+                      <CheckCircle className="h-4 w-4 mr-2" />
+                      Tắt chế độ bảo trì
+                    </Button>
+                  </div>
+                  <div className="p-4 bg-orange-50 rounded-lg">
+                    <p className="text-sm text-orange-800">
+                      <strong>Cảnh báo:</strong> Khi bật chế độ bảo trì, người dùng sẽ không thể truy cập hệ thống.
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+          </Tabs>
+        </div>
       </div>
-
-      <div className="space-y-8">
-        {/* Core Management */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Quản Lý Cốt Lõi</CardTitle>
-            <CardDescription>Các chức năng quản lý chính của hệ thống</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <Link href="/patients" className="block">
-                <Button variant="outline" className="w-full h-20 flex flex-col gap-2 bg-transparent hover:bg-primary/5">
-                  <Users className="h-6 w-6" />
-                  <span>Bệnh Nhân</span>
-                </Button>
-              </Link>
-              <Link href="/doctors" className="block">
-                <Button variant="outline" className="w-full h-20 flex flex-col gap-2 bg-transparent hover:bg-primary/5">
-                  <Stethoscope className="h-6 w-6" />
-                  <span>Bác Sĩ</span>
-                </Button>
-              </Link>
-              <Link href="/staff" className="block">
-                <Button variant="outline" className="w-full h-20 flex flex-col gap-2 bg-transparent hover:bg-primary/5">
-                  <UserCog className="h-6 w-6" />
-                  <span>Nhân Viên</span>
-                </Button>
-              </Link>
-              <Link href="/appointments" className="block">
-                <Button variant="outline" className="w-full h-20 flex flex-col gap-2 bg-transparent hover:bg-primary/5">
-                  <Calendar className="h-6 w-6" />
-                  <span>Lịch Hẹn</span>
-                </Button>
-              </Link>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Medical & Records */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Y Tế & Hồ Sơ</CardTitle>
-            <CardDescription>Quản lý hồ sơ y tế và dược phẩm</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <Link href="/medical-records" className="block">
-                <Button variant="outline" className="w-full h-20 flex flex-col gap-2 bg-transparent hover:bg-primary/5">
-                  <FileText className="h-6 w-6" />
-                  <span>Hồ Sơ Y Tế</span>
-                </Button>
-              </Link>
-              <Link href="/medicine" className="block">
-                <Button variant="outline" className="w-full h-20 flex flex-col gap-2 bg-transparent hover:bg-primary/5">
-                  <Pill className="h-6 w-6" />
-                  <span>Thuốc</span>
-                </Button>
-              </Link>
-              <Link href="/pharmacy" className="block">
-                <Button variant="outline" className="w-full h-20 flex flex-col gap-2 bg-transparent hover:bg-primary/5">
-                  <Activity className="h-6 w-6" />
-                  <span>Nhà Thuốc</span>
-                </Button>
-              </Link>
-              <Link href="/blood-bank" className="block">
-                <Button variant="outline" className="w-full h-20 flex flex-col gap-2 bg-transparent hover:bg-primary/5">
-                  <Droplets className="h-6 w-6" />
-                  <span>Ngân Hàng Máu</span>
-                </Button>
-              </Link>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Facility Management */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Quản Lý Cơ Sở</CardTitle>
-            <CardDescription>Quản lý phòng và dịch vụ cơ sở vật chất</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <Link href="/rooms" className="block">
-                <Button variant="outline" className="w-full h-20 flex flex-col gap-2 bg-transparent hover:bg-primary/5">
-                  <Building2 className="h-6 w-6" />
-                  <span>Phòng</span>
-                </Button>
-              </Link>
-              <Link href="/room-assignments" className="block">
-                <Button variant="outline" className="w-full h-20 flex flex-col gap-2 bg-transparent hover:bg-primary/5">
-                  <BedDouble className="h-6 w-6" />
-                  <span>Phân Phòng</span>
-                </Button>
-              </Link>
-              <Link href="/cleaning" className="block">
-                <Button variant="outline" className="w-full h-20 flex flex-col gap-2 bg-transparent hover:bg-primary/5">
-                  <Sparkles className="h-6 w-6" />
-                  <span>Vệ Sinh</span>
-                </Button>
-              </Link>
-              <Link href="/ambulances" className="block">
-                <Button variant="outline" className="w-full h-20 flex flex-col gap-2 bg-transparent hover:bg-primary/5">
-                  <Truck className="h-6 w-6" />
-                  <span>Xe Cứu Thương</span>
-                </Button>
-              </Link>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Financial & Operations */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Tài Chính & Vận Hành</CardTitle>
-            <CardDescription>Quản lý tài chính và hoạt động vận hành</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <Link href="/billing" className="block">
-                <Button variant="outline" className="w-full h-20 flex flex-col gap-2 bg-transparent hover:bg-primary/5">
-                  <DollarSign className="h-6 w-6" />
-                  <span>Hóa Đơn</span>
-                </Button>
-              </Link>
-              <Link href="/ambulance-log" className="block">
-                <Button variant="outline" className="w-full h-20 flex flex-col gap-2 bg-transparent hover:bg-primary/5">
-                  <ClipboardList className="h-6 w-6" />
-                  <span>Nhật Ký Xe</span>
-                </Button>
-              </Link>
-              <Link href="/news-management" className="block">
-                <Button variant="outline" className="w-full h-20 flex flex-col gap-2 bg-transparent hover:bg-primary/5">
-                  <Newspaper className="h-6 w-6" />
-                  <span>Quản Lý Tin</span>
-                </Button>
-              </Link>
-              <Link href="/help" className="block">
-                <Button variant="outline" className="w-full h-20 flex flex-col gap-2 bg-transparent hover:bg-primary/5">
-                  <HelpCircle className="h-6 w-6" />
-                  <span>Trợ Giúp</span>
-                </Button>
-              </Link>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-    </DashboardLayout>
+    </div>
   )
 }

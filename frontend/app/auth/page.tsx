@@ -86,47 +86,22 @@ export default function AuthPage() {
       setIsLoading(true)
       try {
         if (isLogin) {
-          // First, check if it's a demo account
-          const demoAccount = demoAccounts.find(
-            (acc) => acc.email === formData.email && acc.password === formData.password,
-          )
+          // Always use real API authentication
+          try {
+            const response = await apiClient.login(formData.email, formData.password)
+            console.log("Login API response:", response)
 
-          if (demoAccount) {
-            console.log("Using demo account:", demoAccount.role)
-            // Demo: lưu "token" giả để hợp với flow AuthProvider
-            await login("demo_token")
+            // Clear any old demo data first
+            localStorage.removeItem("user_info")
+            localStorage.removeItem("user_role")
 
-            const roleRoutes: Record<string, string> = {
-              Admin: "/dashboard/admin",
-              Doctor: "/dashboard/doctor",
-              Nurse: "/dashboard/nurse",
-              Patient: "/dashboard/patient",
-              Pharmacist: "/dashboard/pharmacist",
-              Technician: "/dashboard/technician",
-              "Lab Assistant": "/dashboard/lab",
-              Driver: "/dashboard/driver",
-              Worker: "/dashboard/worker",
-            }
-
-            router.push(roleRoutes[demoAccount.role] || "/dashboard")
-          } else {
-            // Not a demo account, try real API authentication
-            try {
-              const response = await apiClient.login(formData.email, formData.password)
-              console.log("Login API response:", response)
-
-              // Clear any old demo data first
-              localStorage.removeItem("user_info")
-              localStorage.removeItem("user_role")
-
-              await login(response.token)
-              
-              // The login function in auth-context now handles automatic redirection
-              // based on user role, so we don't need manual redirect here
-            } catch (apiError) {
-              console.error("API authentication failed:", apiError)
-              setErrors({ email: "Tài khoản không tồn tại hoặc mật khẩu không đúng." })
-            }
+            await login(response.token)
+            
+            // The login function in auth-context now handles automatic redirection
+            // based on user role, so we don't need manual redirect here
+          } catch (apiError) {
+            console.error("API authentication failed:", apiError)
+            setErrors({ email: "Tài khoản không tồn tại hoặc mật khẩu không đúng." })
           }
         } else {
           // Registration
@@ -161,33 +136,15 @@ export default function AuthPage() {
   const handleDemoLogin = async (account: (typeof demoAccounts)[0]) => {
     setIsLoading(true)
     try {
-      // Create a proper demo token structure
-      const demoUserData = {
-        id: account.user_id,
-        user_id: account.user_id,
-        email: account.email,
-        role: account.role.toLowerCase(),
-        roles: [account.role.toLowerCase()],
-        permissions: [],
-        type: account.role === "Patient" ? "patient" : "staff",
-        patient_id: account.role === "Patient" ? 1 : null,
-        staff_id: account.role !== "Patient" ? 1 : null,
-        profile: {
-          first_name: account.firstName,
-          last_name: account.lastName,
-          position: account.role,
-          staff_role: account.role !== "Patient" ? account.role : null,
-        },
-      }
+      // Use real API authentication for demo accounts
+      const response = await apiClient.login(account.email, account.password)
+      console.log("Demo login API response:", response)
 
-      // Store demo token and user data
-      const demoToken = `demo_${account.user_id}_${Date.now()}`
-      localStorage.setItem("auth_token", demoToken)
-      localStorage.setItem("user_role", account.role.toLowerCase())
-      localStorage.setItem("user_info", JSON.stringify(demoUserData))
+      // Clear any old data
+      localStorage.removeItem("user_info")
+      localStorage.removeItem("user_role")
 
-      // Set demo user directly without API call
-      await login(demoToken)
+      await login(response.token)
       
       // The login function in auth-context now handles automatic redirection
       // based on user role, so we don't need manual redirect here

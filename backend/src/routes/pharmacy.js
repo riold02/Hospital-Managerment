@@ -2,7 +2,143 @@ const express = require('express');
 const router = express.Router();
 const pharmacyController = require('../controllers/pharmacyController');
 const { validatePharmacy } = require('../middleware/validation');
-const { authenticateToken, requireStaff } = require('../middleware/auth');
+const { authenticateToken, requireStaff, requireRole } = require('../middleware/auth');
+
+// Pharmacist Dashboard Routes
+/**
+ * @swagger
+ * /api/v1/pharmacy/pharmacist/dashboard:
+ *   get:
+ *     summary: Get pharmacist dashboard overview
+ *     tags: [Pharmacy]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Pharmacist dashboard data retrieved successfully
+ */
+router.get('/pharmacist/dashboard', authenticateToken, requireRole(['pharmacist', 'admin']), pharmacyController.getPharmacistDashboard);
+
+/**
+ * @swagger
+ * /api/v1/pharmacy/prescriptions/pending:
+ *   get:
+ *     summary: Get pending prescriptions to dispense
+ *     tags: [Pharmacy]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *         description: Page number
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *         description: Items per page
+ *     responses:
+ *       200:
+ *         description: Pending prescriptions retrieved successfully
+ */
+router.get('/prescriptions/pending', authenticateToken, requireRole(['pharmacist', 'admin']), pharmacyController.getPendingPrescriptions);
+
+/**
+ * @swagger
+ * /api/v1/pharmacy/inventory:
+ *   get:
+ *     summary: Get medicine inventory with enhanced filtering
+ *     tags: [Pharmacy]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *         description: Page number
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *         description: Items per page
+ *       - in: query
+ *         name: search
+ *         schema:
+ *           type: string
+ *         description: Search by medicine name
+ *       - in: query
+ *         name: category
+ *         schema:
+ *           type: string
+ *         description: Filter by category
+ *       - in: query
+ *         name: lowStock
+ *         schema:
+ *           type: boolean
+ *         description: Filter low stock items
+ *     responses:
+ *       200:
+ *         description: Medicine inventory retrieved successfully
+ */
+router.get('/inventory', authenticateToken, requireRole(['pharmacist', 'admin']), pharmacyController.getMedicineInventory);
+
+/**
+ * @swagger
+ * /api/v1/pharmacy/medicines/{medicineId}/stock:
+ *   put:
+ *     summary: Update medicine stock
+ *     tags: [Pharmacy]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: medicineId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: Medicine ID
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               stock_quantity:
+ *                 type: integer
+ *               expiry_date:
+ *                 type: string
+ *                 format: date
+ *               batch_number:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Medicine stock updated successfully
+ */
+router.put('/medicines/:medicineId/stock', authenticateToken, requireRole(['pharmacist', 'admin']), pharmacyController.updateMedicineStock);
+
+/**
+ * @swagger
+ * /api/v1/pharmacy/medicines/expiring:
+ *   get:
+ *     summary: Get medicines expiring soon
+ *     tags: [Pharmacy]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: days
+ *         schema:
+ *           type: integer
+ *           default: 30
+ *         description: Days ahead to check for expiry
+ *     responses:
+ *       200:
+ *         description: Expiring medicines retrieved successfully
+ */
+router.get('/medicines/expiring', authenticateToken, requireRole(['pharmacist', 'admin']), pharmacyController.getExpiringMedicines);
 
 /**
  * @swagger

@@ -54,6 +54,7 @@ interface Appointment {
   time?: string
   purpose?: string
   status: string
+  rawStatus?: string // Original English status for API calls
   canCancel?: boolean
   appointment_date?: string
   appointment_time?: string
@@ -271,16 +272,42 @@ export default function PatientDashboard() {
           }
           
           // Format appointments data before setting
-          const formattedAppointments = Array.isArray(appointmentsData) ? appointmentsData.map(apt => ({
-            id: apt.appointment_id || apt.id,
-            doctor: apt.doctor ? `${apt.doctor.first_name || apt.doctor.firstName || ''} ${apt.doctor.last_name || apt.doctor.lastName || ''}`.trim() : 'N/A',
-            department: apt.doctor?.specialty || apt.department || 'N/A',
-            date: apt.appointment_date ? new Date(apt.appointment_date).toISOString().split('T')[0] : apt.date,
-            time: apt.appointment_time ? new Date(apt.appointment_time).toTimeString().slice(0, 5) : apt.time,
-            purpose: apt.purpose || '',
-            status: apt.status === 'Scheduled' ? 'Chờ xác nhận' : apt.status,
-            canCancel: apt.status === 'Scheduled' || apt.status === 'Chờ xác nhận'
-          })) : []
+          const formattedAppointments = Array.isArray(appointmentsData) ? appointmentsData.map(apt => {
+            // Normalize status from backend
+            let normalizedStatus = apt.status
+            const statusMap: any = {
+              'SCHEDULED': 'Scheduled',
+              'CONFIRMED': 'Confirmed',
+              'COMPLETED': 'Completed',
+              'CANCELLED': 'Cancelled',
+              'Scheduled': 'Scheduled',
+              'Confirmed': 'Confirmed',
+              'Completed': 'Completed',
+              'Cancelled': 'Cancelled'
+            }
+            normalizedStatus = statusMap[apt.status] || apt.status
+            
+            // Convert to Vietnamese for display
+            const statusVietnamese: any = {
+              'Scheduled': 'Đã lên lịch',
+              'Confirmed': 'Đã xác nhận',
+              'Completed': 'Hoàn thành',
+              'Cancelled': 'Đã hủy',
+              'No Show': 'Không đến'
+            }
+            
+            return {
+              id: apt.appointment_id || apt.id,
+              doctor: apt.doctor ? `${apt.doctor.first_name || apt.doctor.firstName || ''} ${apt.doctor.last_name || apt.doctor.lastName || ''}`.trim() : 'N/A',
+              department: apt.doctor?.specialty || apt.department || 'N/A',
+              date: apt.appointment_date ? new Date(apt.appointment_date).toISOString().split('T')[0] : apt.date,
+              time: apt.appointment_time ? new Date(apt.appointment_time).toTimeString().slice(0, 5) : apt.time,
+              purpose: apt.purpose || '',
+              status: statusVietnamese[normalizedStatus] || normalizedStatus,
+              rawStatus: normalizedStatus, // Keep original for API calls
+              canCancel: normalizedStatus === 'Scheduled' || normalizedStatus === 'Confirmed'
+            }
+          }) : []
           
           setAppointments(formattedAppointments)
         } catch (error) {
@@ -373,6 +400,14 @@ export default function PatientDashboard() {
       const newAppointment = await apiClient.createAppointment(appointmentData)
       
       // Convert backend response to frontend format
+      const statusVietnamese: any = {
+        'Scheduled': 'Đã lên lịch',
+        'Confirmed': 'Đã xác nhận',
+        'Completed': 'Hoàn thành',
+        'Cancelled': 'Đã hủy',
+        'No Show': 'Không đến'
+      }
+      
       const formattedAppointment = {
         id: newAppointment.appointment_id,
         doctor: `${newAppointment.doctor?.first_name || ''} ${newAppointment.doctor?.last_name || ''}`.trim(),
@@ -380,8 +415,9 @@ export default function PatientDashboard() {
         date: new Date(newAppointment.appointment_date).toISOString().split('T')[0],
         time: new Date(newAppointment.appointment_time).toTimeString().slice(0, 5), // Format HH:MM
         purpose: newAppointment.purpose || '',
-        status: newAppointment.status === 'Scheduled' ? 'Chờ xác nhận' : newAppointment.status,
-        canCancel: newAppointment.status === 'Scheduled' || newAppointment.status === 'Chờ xác nhận'
+        status: statusVietnamese[newAppointment.status] || newAppointment.status,
+        rawStatus: newAppointment.status, // Keep original for API calls
+        canCancel: newAppointment.status === 'Scheduled' || newAppointment.status === 'Confirmed'
       }
 
       setAppointments([...appointments, formattedAppointment])
@@ -426,17 +462,17 @@ export default function PatientDashboard() {
       await apiClient.updateAppointment(id.toString(), {
         appointment_date: newDate,
         appointment_time: newTime,
-        status: "Chờ xác nhận",
+        status: "Scheduled", // Send English status to backend
       })
 
       setAppointments(
         appointments.map((apt) =>
-          apt.id === id ? { ...apt, date: newDate, time: newTime, status: "Chờ xác nhận" } : apt,
+          apt.id === id ? { ...apt, date: newDate, time: newTime, status: "Đã lên lịch", rawStatus: "Scheduled" } : apt,
         ),
       )
       toast({
         title: "Đổi lịch thành công",
-        description: "Lịch hẹn mới đang chờ xác nhận.",
+        description: "Lịch hẹn mới đã được cập nhật.",
       })
     } catch (error) {
       console.error("[v0] Error rescheduling appointment:", error)
@@ -504,12 +540,18 @@ export default function PatientDashboard() {
 
   const getStatusColor = (status: string) => {
     switch (status) {
+      case "Đã lên lịch":
+        return "bg-blue-100 text-blue-800"
       case "Đã xác nhận":
+        return "bg-purple-100 text-purple-800"
+      case "Hoàn thành":
         return "bg-green-100 text-green-800"
-      case "Chờ xác nhận":
-        return "bg-yellow-100 text-yellow-800"
       case "Đã hủy":
         return "bg-red-100 text-red-800"
+      case "Không đến":
+        return "bg-gray-100 text-gray-800"
+      case "Chờ xác nhận": // Legacy status
+        return "bg-yellow-100 text-yellow-800"
       case "Đã cấp phát":
         return "bg-green-100 text-green-800"
       case "Chờ cấp phát":

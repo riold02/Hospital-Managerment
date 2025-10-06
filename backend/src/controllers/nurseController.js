@@ -1,0 +1,394 @@
+const prisma = require('../config/prisma');
+
+/**
+ * Nurse Dashboard Controller
+ * Handles nurse-specific functionality for patient care
+ */
+
+// Get nurse dashboard overview
+const getNurseDashboard = async (req, res) => {
+  try {
+    const nurseId = req.user.user_id;
+    
+    const [
+      assignedPatients,
+      todayMedications,
+      vitalSignsPending,
+      criticalAlerts,
+      shiftInfo,
+      recentActivities
+    ] = await Promise.all([
+      // Assigned inpatients
+      prisma.room_assignment.findMany({
+        where: {
+          discharge_date: null,
+          room: {
+            department: {
+              staff: {
+                some: {
+                  user_id: nurseId
+                }
+              }
+            }
+          }
+        },
+        include: {
+          patient: {
+            select: {
+              patient_id: true,
+              first_name: true,
+              last_name: true,
+              date_of_birth: true,
+              medical_conditions: true
+            }
+          },
+          room: {
+            select: {
+              room_number: true,
+              department: {
+                select: {
+                  department_name: true
+                }
+              }
+            }
+          }
+        }
+      }),
+      
+      // Today's medications to administer
+      prisma.prescription.findMany({
+        where: {
+          created_at: {
+            gte: new Date(new Date().setHours(0, 0, 0, 0)),
+            lt: new Date(new Date().setHours(23, 59, 59, 999))
+          },
+          appointment: {
+            patient: {
+              room_assignments: {
+                some: {
+                  discharge_date: null
+                }
+              }
+            }
+          }
+        },
+        include: {
+          prescription_items: {
+            include: {
+              medicine: true
+            }
+          },
+          appointment: {
+            include: {
+              patient: {
+                select: {
+                  patient_id: true,
+                  first_name: true,
+                  last_name: true
+                }
+              }
+            }
+          }
+        }
+      }),
+      
+      // Patients needing vital signs check
+      prisma.room_assignment.count({
+        where: {
+          discharge_date: null,
+          patient: {
+            medical_records: {
+              some: {
+                created_at: {
+                  lt: new Date(Date.now() - 8 * 60 * 60 * 1000) // 8 hours ago
+                }
+              }
+            }
+          }
+        }
+      }),
+      
+      // Critical alerts count
+      prisma.patient.count({
+        where: {
+          medical_conditions: {
+            contains: 'critical'
+          },
+          room_assignments: {
+            some: {
+              discharge_date: null
+            }
+          }
+        }
+      }),
+      
+      // Current shift info
+      prisma.staff.findFirst({
+        where: {
+          user_id: nurseId
+        },
+        include: {
+          department: true
+        }
+      }),
+      
+      // Recent medical records
+      prisma.medical_record.findMany({
+        take: 10,
+        orderBy: { created_at: 'desc' },
+        where: {
+          patient: {
+            room_assignments: {
+              some: {
+                discharge_date: null
+              }
+            }
+          }
+        },
+        include: {
+          patient: {
+            select: {
+              first_name: true,
+              last_name: true
+            }
+          }
+        }
+      })
+    ]);
+
+    const dashboardData = {
+      overview: {
+        assignedPatients: assignedPatients.length,
+        todayMedications: todayMedications.reduce((sum, p) => sum + p.prescription_items.length, 0),
+        vitalSignsPending,
+        criticalAlerts
+      },
+      assignedPatients,
+      todayMedications,
+      shiftInfo,
+      recentActivities
+    };
+
+    res.json({
+      success: true,
+      data: dashboardData
+    });
+  } catch (error) {
+    console.error('Error fetching nurse dashboard:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fetch nurse dashboard data'
+    });
+  }
+};
+
+// Get patients assigned to nurse
+const getAssignedPatients = async (req, res) => {
+  try {
+    const nurseId = req.user.user_id;
+    
+    const patients = await prisma.room_assignment.findMany({
+      where: {
+        discharge_date: null,
+        room: {
+          department: {
+            staff: {
+              some: {
+                user_id: nurseId
+              }
+            }
+          }
+        }
+      },
+      include: {
+        patient: {
+          include: {
+            medical_records: {
+              orderBy: { created_at: 'desc' },
+              take: 1
+            }
+          }
+        },
+        room: {
+          include: {
+            department: true
+          }
+        }
+      }
+    });
+
+    res.json({
+      success: true,
+      data: patients
+    });
+  } catch (error) {
+    console.error('Error fetching assigned patients:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fetch assigned patients'
+    });
+  }
+};
+
+// Record vital signs
+const recordVitalSigns = async (req, res) => {
+  try {
+    const { patientId } = req.params;
+    const {
+      blood_pressure_systolic,
+      blood_pressure_diastolic,
+      heart_rate,
+      temperature,
+      respiratory_rate,
+      oxygen_saturation,
+      notes
+    } = req.body;
+
+    // Create medical record entry for vital signs
+    const vitalSigns = await prisma.medical_record.create({
+      data: {
+        patient_id: patientId,
+        record_type: 'Vital Signs',
+        diagnosis: `BP: ${blood_pressure_systolic}/${blood_pressure_diastolic}, HR: ${heart_rate}, Temp: ${temperature}°C, RR: ${respiratory_rate}, SpO2: ${oxygen_saturation}%`,
+        treatment: notes || '',
+        recorded_by: req.user.user_id
+      }
+    });
+
+    res.json({
+      success: true,
+      data: vitalSigns,
+      message: 'Vital signs recorded successfully'
+    });
+  } catch (error) {
+    console.error('Error recording vital signs:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to record vital signs'
+    });
+  }
+};
+
+// Get medication schedule
+const getMedicationSchedule = async (req, res) => {
+  try {
+    const { date } = req.query;
+    const targetDate = date ? new Date(date) : new Date();
+    
+    const medications = await prisma.prescription.findMany({
+      where: {
+        created_at: {
+          gte: new Date(targetDate.setHours(0, 0, 0, 0)),
+          lt: new Date(targetDate.setHours(23, 59, 59, 999))
+        }
+      },
+      include: {
+        prescription_items: {
+          include: {
+            medicine: true
+          }
+        },
+        appointment: {
+          include: {
+            patient: {
+              select: {
+                patient_id: true,
+                first_name: true,
+                last_name: true,
+                room_assignments: {
+                  where: {
+                    discharge_date: null
+                  },
+                  include: {
+                    room: true
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    });
+
+    res.json({
+      success: true,
+      data: medications
+    });
+  } catch (error) {
+    console.error('Error fetching medication schedule:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fetch medication schedule'
+    });
+  }
+};
+
+// Record medication administration
+const recordMedicationAdministration = async (req, res) => {
+  try {
+    const { prescriptionItemId } = req.params;
+    const { administered_at, notes, dose_given } = req.body;
+
+    // Record in pharmacy records
+    const administration = await prisma.pharmacy_record.create({
+      data: {
+        prescription_id: prescriptionItemId,
+        dispensed_by: req.user.user_id,
+        quantity_dispensed: dose_given || 1,
+        notes: notes || '',
+        dispensed_at: administered_at ? new Date(administered_at) : new Date()
+      }
+    });
+
+    res.json({
+      success: true,
+      data: administration,
+      message: 'Medication administration recorded successfully'
+    });
+  } catch (error) {
+    console.error('Error recording medication administration:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to record medication administration'
+    });
+  }
+};
+
+// Create nursing note
+const createNursingNote = async (req, res) => {
+  try {
+    const { patientId } = req.params;
+    const { note_type, content, priority } = req.body;
+
+    const nursingNote = await prisma.medical_record.create({
+      data: {
+        patient_id: patientId,
+        record_type: note_type || 'Nursing Note',
+        diagnosis: content,
+        treatment: priority || 'Normal',
+        recorded_by: req.user.user_id
+      }
+    });
+
+    res.json({
+      success: true,
+      data: nursingNote,
+      message: 'Nursing note created successfully'
+    });
+  } catch (error) {
+    console.error('Error creating nursing note:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to create nursing note'
+    });
+  }
+};
+
+module.exports = {
+  getNurseDashboard,
+  getAssignedPatients,
+  recordVitalSigns,
+  getMedicationSchedule,
+  recordMedicationAdministration,
+  createNursingNote
+};

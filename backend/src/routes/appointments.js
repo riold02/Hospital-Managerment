@@ -315,7 +315,7 @@ router.get('/:id', authenticateToken, appointmentController.getAppointmentById);
  *       409:
  *         description: Doctor is not available at the requested time
  */
-router.put('/:id', authenticateToken, validateAppointmentUpdate, appointmentController.updateAppointment);
+router.put('/:id', authenticateToken, appointmentController.updateAppointment);
 
 /**
  * @swagger

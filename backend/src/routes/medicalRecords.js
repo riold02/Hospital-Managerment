@@ -2,7 +2,65 @@ const express = require('express');
 const router = express.Router();
 const medicalRecordController = require('../controllers/medicalRecordController');
 const { validateMedicalRecord, validateMedicalRecordUpdate, validateMedicalRecordMedicine } = require('../middleware/validation');
-const { authenticateToken, requireStaff, requireDoctor } = require('../middleware/auth');
+const { authenticateToken, requireStaff, requireDoctor, requireRole } = require('../middleware/auth');
+
+// Technician Dashboard Routes
+/**
+ * @swagger
+ * /api/v1/medical-records/technician/dashboard:
+ *   get:
+ *     summary: Get technician dashboard overview
+ *     tags: [Medical Records]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Technician dashboard data retrieved successfully
+ */
+router.get('/technician/dashboard', authenticateToken, requireRole(['technician', 'admin']), medicalRecordController.getTechnicianDashboard);
+
+/**
+ * @swagger
+ * /api/v1/medical-records/tests/{testId}/result:
+ *   post:
+ *     summary: Record test result
+ *     tags: [Medical Records]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: testId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: Test request ID
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               results:
+ *                 type: object
+ *                 description: Test results data
+ *               reference_ranges:
+ *                 type: string
+ *                 description: Reference ranges for the test
+ *               interpretation:
+ *                 type: string
+ *                 description: Result interpretation
+ *               technician_notes:
+ *                 type: string
+ *                 description: Technician notes
+ *               critical_flag:
+ *                 type: boolean
+ *                 description: Whether result is critical
+ *     responses:
+ *       200:
+ *         description: Test result recorded successfully
+ */
+router.post('/tests/:testId/result', authenticateToken, requireRole(['technician', 'admin']), medicalRecordController.recordTestResult);
 
 /**
  * @swagger

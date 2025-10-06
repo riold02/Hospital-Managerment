@@ -201,7 +201,7 @@ const createRateLimiter = (options = {}) => {
 // Different rate limits for different endpoints
 const authRateLimit = createRateLimiter({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // More lenient limit for development
+  max: 1000, // Increased for development
   message: {
     success: false,
     error: 'Too many authentication attempts. Please try again later.',
@@ -215,7 +215,7 @@ const authRateLimit = createRateLimiter({
 
 const apiRateLimit = createRateLimiter({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // General API limit
+  max: 1000, // Increased for development
 });
 
 const strictRateLimit = createRateLimiter({

@@ -1,0 +1,69 @@
+version: '3.8'
+
+services:
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - NEXT_PUBLIC_API_URL=http://localhost:3001/api/v1
+    depends_on:
+      - backend
+    networks:
+      - hospital-network
+    restart: unless-stopped
+
+  backend:
+    image: backend-backend
+    container_name: hospital_backend_frontend
+    ports:
+      - "3001:3001"
+    environment:
+      - NODE_ENV=production
+      - DATABASE_URL=postgresql://hospital_user:hospital_password@postgres:5432/hospital_db
+      - REDIS_URL=redis://redis:6379
+      - JWT_SECRET=your-super-secret-jwt-key-change-in-production
+      - PORT=3001
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - hospital-network
+    restart: unless-stopped
+    external_links:
+      - hospital_postgres:postgres
+      - hospital_redis:redis
+
+  postgres:
+    image: postgres:15-alpine
+    container_name: hospital_postgres_frontend
+    environment:
+      - POSTGRES_DB=hospital_db
+      - POSTGRES_USER=hospital_user
+      - POSTGRES_PASSWORD=hospital_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - hospital-network
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    container_name: hospital_redis_frontend
+    ports:
+      - "6379:6379"
+    networks:
+      - hospital-network
+    restart: unless-stopped
+
+networks:
+  hospital-network:
+    driver: bridge
+
+volumes:
+  postgres_data:

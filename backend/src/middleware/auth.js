@@ -165,12 +165,16 @@ const requireRole = (...roles) => {
       });
     }
 
-    const userRoles = req.user.roles || [];
-    const hasRole = roles.some(role => 
-      userRoles.includes(role.toLowerCase()) || 
-      userRoles.includes(role.toUpperCase()) ||
-      req.user.role === role.toUpperCase()
-    );
+    const userRoles = Array.isArray(req.user.roles) ? req.user.roles : [];
+    const userRole = req.user.role ? req.user.role.toLowerCase() : '';
+    
+    const hasRole = roles.some(role => {
+      if (!role || typeof role !== 'string') return false;
+      const normalizedRole = role.toLowerCase();
+      return userRoles.includes(normalizedRole) || 
+             userRoles.includes(role.toUpperCase()) ||
+             userRole === normalizedRole;
+    });
 
     if (!hasRole) {
       return res.status(403).json({

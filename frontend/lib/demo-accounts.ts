@@ -10,7 +10,7 @@ export interface DemoAccount {
 export const demoAccounts: DemoAccount[] = [
   {
     email: "admin@demo.com",
-    password: "demo1234",
+    password: "Demo1234",  // Match database password
     role: "Admin",
     firstName: "Demo",
     lastName: "Admin",
@@ -18,7 +18,7 @@ export const demoAccounts: DemoAccount[] = [
   },
   {
     email: "doctor@demo.com",
-    password: "demo1234",
+    password: "Demo1234",  // Match database password
     role: "Doctor",
     firstName: "BS. Demo",
     lastName: "Bác sĩ",
@@ -26,7 +26,7 @@ export const demoAccounts: DemoAccount[] = [
   },
   {
     email: "nurse@demo.com",
-    password: "demo1234",
+    password: "Demo1234",  // Match database password
     role: "Nurse",
     firstName: "Y tá",
     lastName: "Demo",
@@ -34,7 +34,7 @@ export const demoAccounts: DemoAccount[] = [
   },
   {
     email: "patient@demo.com",
-    password: "demo1234",
+    password: "Demo1234",  // Match database password
     role: "Patient",
     firstName: "Bệnh nhân",
     lastName: "Demo",
@@ -42,7 +42,7 @@ export const demoAccounts: DemoAccount[] = [
   },
   {
     email: "pharmacist@demo.com",
-    password: "demo1234",
+    password: "Demo1234",  // Match database password
     role: "Pharmacist",
     firstName: "Dược sĩ",
     lastName: "Demo",
@@ -50,7 +50,7 @@ export const demoAccounts: DemoAccount[] = [
   },
   {
     email: "technician@demo.com",
-    password: "demo1234",
+    password: "Demo1234",  // Match database password
     role: "Technician",
     firstName: "Kỹ thuật viên",
     lastName: "Demo",
@@ -58,7 +58,7 @@ export const demoAccounts: DemoAccount[] = [
   },
   {
     email: "lab@demo.com",
-    password: "demo1234",
+    password: "Demo1234",  // Match database password
     role: "Lab Assistant",
     firstName: "Xét nghiệm",
     lastName: "Demo",
@@ -66,7 +66,7 @@ export const demoAccounts: DemoAccount[] = [
   },
   {
     email: "driver@demo.com",
-    password: "demo1234",
+    password: "Demo1234",  // Match database password
     role: "Driver",
     firstName: "Tài xế",
     lastName: "Demo",
@@ -74,7 +74,7 @@ export const demoAccounts: DemoAccount[] = [
   },
   {
     email: "worker@demo.com",
-    password: "demo1234",
+    password: "Demo1234",  // Match database password
     role: "Worker",
     firstName: "Nhân viên",
     lastName: "Demo",

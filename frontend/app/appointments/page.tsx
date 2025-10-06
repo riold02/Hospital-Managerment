@@ -16,6 +16,8 @@ import { SearchBar } from "@/components/shared/SearchBar"
 import { StatusBadge } from "@/components/shared/StatusBadge"
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog"
 import { CalendarDays, Clock, Plus, Filter } from "lucide-react"
+import { useAuth } from "@/lib/auth-context"
+import { appointmentsApi } from "@/lib/api"
 
 interface Appointment {
   appointment_id: string
@@ -24,7 +26,7 @@ interface Appointment {
   appointment_date: string
   appointment_time: string
   purpose: string
-  status: "Scheduled" | "Completed" | "Cancelled" | "No Show"
+  status: "Scheduled" | "Confirmed" | "Completed" | "Cancelled" | "No Show"
   created_at: string
   patient_id: string
   doctor_id: string
@@ -91,12 +93,14 @@ const mockDoctors = [
 ]
 
 export default function AppointmentsPage() {
-  const [appointments, setAppointments] = useState<Appointment[]>(mockAppointments)
-  const [filteredAppointments, setFilteredAppointments] = useState<Appointment[]>(mockAppointments)
+  const { user } = useAuth()
+  const [appointments, setAppointments] = useState<Appointment[]>([])
+  const [filteredAppointments, setFilteredAppointments] = useState<Appointment[]>([])
   const [searchQuery, setSearchQuery] = useState("")
   const [selectedDoctor, setSelectedDoctor] = useState("all")
   const [selectedPatient, setSelectedPatient] = useState("all")
   const [selectedStatus, setSelectedStatus] = useState("all")
+  const [confirmationFilter, setConfirmationFilter] = useState("all") // all, confirmed, unconfirmed
   const [dateFrom, setDateFrom] = useState("")
   const [dateTo, setDateTo] = useState("")
   const [isFormOpen, setIsFormOpen] = useState(false)
@@ -104,6 +108,7 @@ export default function AppointmentsPage() {
   const [deleteAppointment, setDeleteAppointment] = useState<Appointment | null>(null)
   const [currentPage, setCurrentPage] = useState(1)
   const [pageSize] = useState(10)
+  const [loading, setLoading] = useState(true)
 
   const [formData, setFormData] = useState<AppointmentForm>({
     patient_id: "",
@@ -112,6 +117,65 @@ export default function AppointmentsPage() {
     appointment_time: "",
     purpose: "",
   })
+
+  // Load appointments from API
+  useEffect(() => {
+    const loadAppointments = async () => {
+      try {
+        setLoading(true)
+        const response = await appointmentsApi.getAllAppointments({ limit: 100 })
+        
+        // Transform API response to match local interface
+        const transformedAppointments = response.data.map((apt: any) => {
+          // Normalize status from backend (UPPERCASE) to frontend (PascalCase)
+          let normalizedStatus = apt.status;
+          if (typeof apt.status === 'string') {
+            const statusMap: any = {
+              'SCHEDULED': 'Scheduled',
+              'CONFIRMED': 'Confirmed',
+              'COMPLETED': 'Completed',
+              'CANCELLED': 'Cancelled',
+              'NO_SHOW': 'No Show',
+              'Scheduled': 'Scheduled',
+              'Confirmed': 'Confirmed',
+              'Completed': 'Completed',
+              'Cancelled': 'Cancelled',
+              'No Show': 'No Show'
+            };
+            normalizedStatus = statusMap[apt.status] || apt.status;
+          }
+          
+          return {
+            appointment_id: apt.appointment_id?.toString() || "",
+            patient: apt.patient ? `${apt.patient.first_name} ${apt.patient.last_name}` : "N/A",
+            doctor: apt.doctor ? `BS. ${apt.doctor.first_name} ${apt.doctor.last_name}` : "N/A",
+            appointment_date: apt.appointment_date,
+            appointment_time: apt.appointment_time,
+            purpose: apt.purpose || "",
+            status: normalizedStatus,
+            created_at: apt.created_at,
+            patient_id: apt.patient_id?.toString() || "",
+            doctor_id: apt.doctor_id?.toString() || "",
+          };
+        })
+        
+        setAppointments(transformedAppointments)
+      } catch (error) {
+        console.error("Error loading appointments:", error)
+        toast({
+          title: "Lỗi",
+          description: "Không thể tải danh sách lịch hẹn",
+          variant: "destructive",
+        })
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    if (user) {
+      loadAppointments()
+    }
+  }, [user])
 
   // Filter appointments
   useEffect(() => {
@@ -125,17 +189,23 @@ export default function AppointmentsPage() {
       const matchesDoctor = selectedDoctor === "all" || appointment.doctor_id === selectedDoctor
       const matchesPatient = selectedPatient === "all" || appointment.patient_id === selectedPatient
       const matchesStatus = selectedStatus === "all" || appointment.status === selectedStatus
+      
+      // Filter by confirmation status (for nurses)
+      const matchesConfirmation =
+        confirmationFilter === "all" ||
+        (confirmationFilter === "confirmed" && appointment.status === "Confirmed") ||
+        (confirmationFilter === "unconfirmed" && appointment.status === "Scheduled")
 
       const appointmentDate = new Date(appointment.appointment_date)
       const matchesDateFrom = !dateFrom || appointmentDate >= new Date(dateFrom)
       const matchesDateTo = !dateTo || appointmentDate <= new Date(dateTo)
 
-      return matchesSearch && matchesDoctor && matchesPatient && matchesStatus && matchesDateFrom && matchesDateTo
+      return matchesSearch && matchesDoctor && matchesPatient && matchesStatus && matchesConfirmation && matchesDateFrom && matchesDateTo
     })
 
     setFilteredAppointments(filtered)
     setCurrentPage(1)
-  }, [appointments, searchQuery, selectedDoctor, selectedPatient, selectedStatus, dateFrom, dateTo])
+  }, [appointments, searchQuery, selectedDoctor, selectedPatient, selectedStatus, confirmationFilter, dateFrom, dateTo])
 
   // Check for doctor time conflicts
   const checkTimeConflict = (doctorId: string, date: string, time: string, excludeId?: string): boolean => {
@@ -256,17 +326,33 @@ export default function AppointmentsPage() {
     setIsFormOpen(true)
   }
 
-  const handleStatusUpdate = (
+  const handleStatusUpdate = async (
     appointmentId: string,
-    newStatus: "Scheduled" | "Completed" | "Cancelled" | "No Show",
+    newStatus: "Scheduled" | "Confirmed" | "Completed" | "Cancelled" | "No Show",
   ) => {
-    setAppointments((prev) =>
-      prev.map((apt) => (apt.appointment_id === appointmentId ? { ...apt, status: newStatus } : apt)),
-    )
-    toast({
-      title: "Thành công",
-      description: "Cập nhật trạng thái thành công",
-    })
+    try {
+      // Call the API to update the appointment status
+      await appointmentsApi.updateAppointment(Number(appointmentId), {
+        status: newStatus.toUpperCase() as any
+      })
+      
+      // Update local state after successful API call
+      setAppointments((prev) =>
+        prev.map((apt) => (apt.appointment_id === appointmentId ? { ...apt, status: newStatus } : apt)),
+      )
+      
+      toast({
+        title: "Thành công",
+        description: "Cập nhật trạng thái thành công",
+      })
+    } catch (error) {
+      console.error("Error updating appointment status:", error)
+      toast({
+        title: "Lỗi",
+        description: "Không thể cập nhật trạng thái lịch hẹn",
+        variant: "destructive",
+      })
+    }
   }
 
   const handleDelete = () => {
@@ -284,6 +370,7 @@ export default function AppointmentsPage() {
     setSelectedDoctor("all")
     setSelectedPatient("all")
     setSelectedStatus("all")
+    setConfirmationFilter("all")
     setDateFrom("")
     setDateTo("")
     setSearchQuery("")
@@ -315,6 +402,32 @@ export default function AppointmentsPage() {
       key: "appointment_time",
       label: "Giờ hẹn",
       sortable: true,
+      render: (value: string) => {
+        // Handle various time formats from backend
+        if (!value) return "Chưa có giờ";
+        
+        try {
+          // If it's already in HH:MM format
+          if (typeof value === 'string' && /^\d{2}:\d{2}/.test(value)) {
+            return value.substring(0, 5);
+          }
+          
+          // If it's an ISO string or Date, extract time
+          const date = new Date(value);
+          if (!isNaN(date.getTime())) {
+            return date.toLocaleTimeString('vi-VN', { 
+              hour: '2-digit', 
+              minute: '2-digit',
+              hour12: false 
+            });
+          }
+          
+          return "Chưa có giờ";
+        } catch (error) {
+          console.error('Error formatting time:', error);
+          return "Chưa có giờ";
+        }
+      },
     },
     {
       key: "purpose",
@@ -351,6 +464,7 @@ export default function AppointmentsPage() {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="Scheduled">Đã lên lịch</SelectItem>
+              <SelectItem value="Confirmed">Đã xác nhận</SelectItem>
               <SelectItem value="Completed">Hoàn thành</SelectItem>
               <SelectItem value="Cancelled">Đã hủy</SelectItem>
               <SelectItem value="No Show">Không đến</SelectItem>
@@ -471,7 +585,7 @@ export default function AppointmentsPage() {
       </div>
 
       {/* Statistics Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Tổng lịch hẹn</CardTitle>
@@ -483,13 +597,24 @@ export default function AppointmentsPage() {
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Hôm nay</CardTitle>
-            <Clock className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-sm font-medium">Chưa xác nhận</CardTitle>
+            <Clock className="h-4 w-4 text-blue-600" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {appointments.filter((apt) => apt.appointment_date === new Date().toISOString().split("T")[0]).length}
+              {appointments.filter((apt) => apt.status === "Scheduled").length}
             </div>
+            <p className="text-xs text-muted-foreground mt-1">Cần y tá xác nhận</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Đã xác nhận</CardTitle>
+            <CalendarDays className="h-4 w-4 text-purple-600" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{appointments.filter((apt) => apt.status === "Confirmed").length}</div>
+            <p className="text-xs text-muted-foreground mt-1">Đã được y tá xác nhận</p>
           </CardContent>
         </Card>
         <Card>
@@ -521,7 +646,7 @@ export default function AppointmentsPage() {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-6 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-7 gap-4">
             <div>
               <Label>Bác sĩ</Label>
               <Select value={selectedDoctor} onValueChange={setSelectedDoctor}>
@@ -565,9 +690,24 @@ export default function AppointmentsPage() {
                 <SelectContent>
                   <SelectItem value="all">Tất cả trạng thái</SelectItem>
                   <SelectItem value="Scheduled">Đã lên lịch</SelectItem>
+                  <SelectItem value="Confirmed">Đã xác nhận</SelectItem>
                   <SelectItem value="Completed">Hoàn thành</SelectItem>
                   <SelectItem value="Cancelled">Đã hủy</SelectItem>
                   <SelectItem value="No Show">Không đến</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
+              <Label>Xác nhận (Y tá)</Label>
+              <Select value={confirmationFilter} onValueChange={setConfirmationFilter}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Tất cả</SelectItem>
+                  <SelectItem value="confirmed">Đã xác nhận</SelectItem>
+                  <SelectItem value="unconfirmed">Chưa xác nhận</SelectItem>
                 </SelectContent>
               </Select>
             </div>

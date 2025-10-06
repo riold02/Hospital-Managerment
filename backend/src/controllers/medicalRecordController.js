@@ -2,6 +2,173 @@ const { prisma } = require('../config/prisma');
 const { validationResult } = require('express-validator');
 
 class MedicalRecordController {
+  // Get technician dashboard overview
+  async getTechnicianDashboard(req, res) {
+    try {
+      const [
+        pendingTests,
+        completedToday,
+        equipmentStatus,
+        criticalResults,
+        recentTests
+      ] = await Promise.all([
+        // Pending lab tests
+        prisma.medical_records.count({
+          where: {
+            record_type: 'Lab Test Requested',
+            diagnosis: {
+              not: {
+                contains: 'completed'
+              }
+            }
+          }
+        }),
+        
+        // Tests completed today
+        prisma.medical_records.count({
+          where: {
+            record_type: 'Lab Result',
+            created_at: {
+              gte: new Date(new Date().setHours(0, 0, 0, 0)),
+              lt: new Date(new Date().setHours(23, 59, 59, 999))
+            }
+          }
+        }),
+        
+        // Mock equipment status - in real system this would come from equipment management
+        Promise.resolve([
+          { name: 'CBC Analyzer', status: 'operational', last_maintenance: '2024-09-20' },
+          { name: 'Chemistry Analyzer', status: 'maintenance', last_maintenance: '2024-09-18' },
+          { name: 'Microscope Unit A', status: 'operational', last_maintenance: '2024-09-22' }
+        ]),
+        
+        // Critical results requiring attention
+        prisma.medical_records.count({
+          where: {
+            record_type: 'Lab Result',
+            diagnosis: {
+              contains: 'critical'
+            },
+            created_at: {
+              gte: new Date(Date.now() - 24 * 60 * 60 * 1000)
+            }
+          }
+        }),
+        
+        // Recent test activities
+        prisma.medical_records.findMany({
+          take: 10,
+          orderBy: { created_at: 'desc' },
+          where: {
+            record_type: {
+              in: ['Lab Test Requested', 'Lab Result']
+            }
+          },
+          include: {
+            patient: {
+              select: {
+                first_name: true,
+                last_name: true,
+                patient_id: true
+              }
+            }
+          }
+        })
+      ]);
+
+      const dashboardData = {
+        overview: {
+          pendingTests,
+          completedToday,
+          equipmentOperational: equipmentStatus.filter(e => e.status === 'operational').length,
+          totalEquipment: equipmentStatus.length,
+          criticalResults
+        },
+        equipmentStatus,
+        recentTests
+      };
+
+      res.json({
+        success: true,
+        data: dashboardData
+      });
+    } catch (error) {
+      console.error('Error fetching technician dashboard:', error);
+      res.status(500).json({
+        success: false,
+        error: 'Failed to fetch technician dashboard data'
+      });
+    }
+  }
+
+  // Record test result
+  async recordTestResult(req, res) {
+    try {
+      const { testId } = req.params;
+      const { 
+        results, 
+        reference_ranges, 
+        interpretation, 
+        technician_notes,
+        critical_flag 
+      } = req.body;
+
+      // Find the test request
+      const testRequest = await prisma.medical_records.findUnique({
+        where: { record_id: parseInt(testId) }
+      });
+
+      if (!testRequest) {
+        return res.status(404).json({
+          success: false,
+          error: 'Test request not found'
+        });
+      }
+
+      // Create lab result record
+      const labResult = await prisma.medical_records.create({
+        data: {
+          patient_id: testRequest.patient_id,
+          doctor_id: testRequest.doctor_id,
+          record_type: 'Lab Result',
+          diagnosis: `${critical_flag ? 'CRITICAL - ' : ''}${interpretation}`,
+          treatment: `Results: ${JSON.stringify(results)} | Ranges: ${reference_ranges}`,
+          symptoms: testRequest.symptoms,
+          notes: `Original Test: ${testRequest.record_id} | Tech Notes: ${technician_notes || ''}`
+        },
+        include: {
+          patient: {
+            select: {
+              first_name: true,
+              last_name: true,
+              patient_id: true
+            }
+          }
+        }
+      });
+
+      // Update original test request as completed
+      await prisma.medical_records.update({
+        where: { record_id: parseInt(testId) },
+        data: {
+          diagnosis: `${testRequest.diagnosis} - completed`,
+          updated_at: new Date()
+        }
+      });
+
+      res.json({
+        success: true,
+        data: labResult,
+        message: 'Test result recorded successfully'
+      });
+    } catch (error) {
+      console.error('Error recording test result:', error);
+      res.status(500).json({
+        success: false,
+        error: 'Failed to record test result'
+      });
+    }
+  }
   // Create medical record
   async createMedicalRecord(req, res) {
     try {

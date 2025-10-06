@@ -1,0 +1,11 @@
+DELETE FROM appointments WHERE doctor_id = 15 AND appointment_date = '2025-10-06';
+DELETE FROM appointments WHERE doctor_id = 6 AND appointment_date = '2025-10-06';
+INSERT INTO appointments (patient_id, doctor_id, appointment_date, appointment_time, status, purpose, created_at, updated_at) VALUES (1, 15, '2025-10-06', '08:00:00'::time, 'Confirmed', 'Kham tong quat', NOW(), NOW());
+INSERT INTO appointments (patient_id, doctor_id, appointment_date, appointment_time, status, purpose, created_at, updated_at) VALUES (2, 15, '2025-10-06', '09:00:00'::time, 'Confirmed', 'Tai kham', NOW(), NOW());
+INSERT INTO appointments (patient_id, doctor_id, appointment_date, appointment_time, status, purpose, created_at, updated_at) VALUES (3, 15, '2025-10-06', '10:00:00'::time, 'Confirmed', 'Kham benh', NOW(), NOW());
+INSERT INTO appointments (patient_id, doctor_id, appointment_date, appointment_time, status, purpose, created_at, updated_at) VALUES (4, 15, '2025-10-06', '11:00:00'::time, 'Confirmed', 'Kiem tra suc khoe', NOW(), NOW());
+INSERT INTO appointments (patient_id, doctor_id, appointment_date, appointment_time, status, purpose, created_at, updated_at) VALUES (5, 15, '2025-10-06', '13:30:00'::time, 'Confirmed', 'Kham chuyen khoa', NOW(), NOW());
+INSERT INTO appointments (patient_id, doctor_id, appointment_date, appointment_time, status, purpose, created_at, updated_at) VALUES (6, 15, '2025-10-06', '14:30:00'::time, 'Confirmed', 'Tu van dieu tri', NOW(), NOW());
+INSERT INTO appointments (patient_id, doctor_id, appointment_date, appointment_time, status, purpose, created_at, updated_at) VALUES (7, 15, '2025-10-06', '15:30:00'::time, 'Confirmed', 'Theo doi benh ly', NOW(), NOW());
+INSERT INTO appointments (patient_id, doctor_id, appointment_date, appointment_time, status, purpose, created_at, updated_at) VALUES (8, 15, '2025-10-06', '16:00:00'::time, 'Confirmed', 'Kham dinh ky', NOW(), NOW());
+SELECT appointment_id, doctor_id, patient_id, appointment_date, appointment_time::text as time, status FROM appointments WHERE doctor_id = 15 AND appointment_date = '2025-10-06' ORDER BY appointment_time;

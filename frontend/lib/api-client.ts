@@ -50,6 +50,19 @@ class ApiClient {
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}))
+        
+        // Handle 401/403 - clear token and redirect to login
+        if (response.status === 401 || response.status === 403) {
+          if (typeof window !== 'undefined') {
+            localStorage.removeItem('auth_token')
+            this.token = null
+            // Redirect to login if not already there
+            if (!window.location.pathname.includes('/auth')) {
+              window.location.href = '/auth'
+            }
+          }
+        }
+        
         throw new ApiError(errorData.message || `HTTP error! status: ${response.status}`, response.status)
       }
 
