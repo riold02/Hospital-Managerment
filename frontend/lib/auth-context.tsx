@@ -56,18 +56,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     // Check if this is a demo token
     if (token && token.startsWith('demo_')) {
-      console.log("[AUTH] Detected demo token:", token.substring(0, 20) + "...")
       // For demo users, get data from localStorage
       const userInfo = localStorage.getItem("user_info")
       if (userInfo) {
         try {
           const userData = JSON.parse(userInfo) as User
-          console.log("[AUTH] Loading demo user from localStorage:", userData)
           setUser(userData)
           setIsDemo(true)
           const primaryRole = (userData.roles?.[0] || userData.role || "patient").toLowerCase()
           localStorage.setItem("user_role", primaryRole)
-          console.log("[AUTH] Demo user role:", primaryRole)
         } catch (error) {
           console.error("[AUTH] Failed to parse demo user info:", error)
           localStorage.removeItem("auth_token")
@@ -77,13 +74,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
       } else {
         // No user info stored yet, wait a bit
-        console.log("No demo user info found, will check again...")
-        setTimeout(() => {
+        setTimeout(() => { 
           const userInfoRetry = localStorage.getItem("user_info")
           if (userInfoRetry) {
             try {
               const userData = JSON.parse(userInfoRetry) as User
-              console.log("Loading demo user from localStorage (retry):", userData)
               setUser(userData)
               setIsDemo(true)
               const primaryRole = (userData.roles?.[0] || userData.role || "patient").toLowerCase()
@@ -96,7 +91,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     } else {
       // For real users, call API
-      console.log("[AUTH] Real token detected, calling /auth/me...")
       apiClient
         .get("/auth/me")
         .then((resp: any) => {

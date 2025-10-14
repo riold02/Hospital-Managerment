@@ -5,6 +5,14 @@ export interface DoctorDashboardData {
   todayAppointments: number
   totalAppointments: number
   totalPrescriptions: number
+  appointmentsToday?: number
+  completedToday?: number
+  appointments?: AppointmentData[]
+  inpatients?: any[]
+  pendingResults?: any[]
+  messages?: any[]
+  criticalAlerts?: number
+  doctorInfo?: DoctorInfo | null
 }
 
 export interface DoctorInfo {

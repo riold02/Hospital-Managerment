@@ -12,7 +12,7 @@ import {
   FlaskConical,
   UserCog,
   Clock,
-  Inbox,
+  // Inbox, // Hidden: Feature not yet implemented
   LogOut,
   User,
 } from "lucide-react"
@@ -104,12 +104,13 @@ export default function DoctorSidebar({
       icon: Clock,
       badge: null,
     },
-    {
-      value: "inbox",
-      label: "Tin nhắn",
-      icon: Inbox,
-      badge: kpiData.newMessages,
-    },
+    // Hidden: Inbox/Messages feature not yet implemented
+    // {
+    //   value: "inbox",
+    //   label: "Tin nhắn",
+    //   icon: Inbox,
+    //   badge: kpiData.newMessages,
+    // },
   ]
 
   const displayName = doctorInfo 

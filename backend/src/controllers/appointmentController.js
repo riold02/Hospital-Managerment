@@ -41,7 +41,21 @@ class AppointmentController {
       const data = await prisma.appointments.create({
         data: appointmentData,
         include: {
-          patient: { select: { patient_id: true, first_name: true, last_name: true, email: true, phone: true } },
+          patient: { 
+            select: { 
+              patient_id: true, 
+              first_name: true, 
+              last_name: true, 
+              email: true, 
+              phone: true,
+              date_of_birth: true,
+              gender: true,
+              blood_type: true,
+              allergies: true,
+              medical_history: true,
+              address: true
+            } 
+          },
           doctor: { select: { doctor_id: true, first_name: true, last_name: true, specialty: true } }
         }
       });
@@ -99,7 +113,13 @@ class AppointmentController {
               first_name: true,
               last_name: true,
               email: true,
-              phone: true
+              phone: true,
+              date_of_birth: true,
+              gender: true,
+              blood_type: true,
+              allergies: true,
+              medical_history: true,
+              address: true
             }
           },
           doctor: {
@@ -358,7 +378,14 @@ class AppointmentController {
               patient_id: true,
               first_name: true,
               last_name: true,
-              phone: true
+              phone: true,
+              date_of_birth: true,
+              gender: true,
+              blood_type: true,
+              allergies: true,
+              medical_history: true,
+              address: true,
+              email: true
             }
           }
         },

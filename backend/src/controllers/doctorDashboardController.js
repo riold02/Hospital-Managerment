@@ -100,7 +100,14 @@ const getDoctorAppointments = async (req, res) => {
               patient_id: true,
               first_name: true,
               last_name: true,
-              phone: true
+              phone: true,
+              date_of_birth: true,
+              gender: true,
+              blood_type: true,
+              allergies: true,
+              medical_history: true,
+              address: true,
+              email: true
             }
           }
         },
@@ -153,8 +160,13 @@ const getDoctorPatients = async (req, res) => {
           first_name: true,
           last_name: true,
           date_of_birth: true,
+          gender: true,
           phone: true,
-          email: true
+          email: true,
+          blood_type: true,
+          allergies: true,
+          medical_history: true,
+          address: true
         },
         skip: Number(offset),
         take: Number(limit),

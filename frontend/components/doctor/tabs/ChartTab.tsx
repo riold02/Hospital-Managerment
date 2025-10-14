@@ -145,7 +145,6 @@ interface ChartTabProps {
   prescriptions: PrescriptionItem[]
   onAddPrescription: () => void
   onRemovePrescription: (id: number) => void
-  onSavePrescriptions: () => void
   medicines: Medicine[]
   medicineSearchOpen: boolean
   onMedicineSearchOpenChange: (open: boolean) => void
@@ -173,7 +172,6 @@ const ChartTab = ({
   prescriptions,
   onAddPrescription,
   onRemovePrescription,
-  onSavePrescriptions,
   medicines,
   medicineSearchOpen,
   onMedicineSearchOpenChange,
@@ -211,8 +209,13 @@ const ChartTab = ({
   const getGenderDisplay = () => {
     const gender = selectedPatient?.patient_info?.gender || selectedPatient?.patient?.gender
     if (!gender) return "Chưa xác định"
-    if (gender === "M" || gender === "Male" || gender === "Nam") return "Nam"
-    if (gender === "F" || gender === "Female" || gender === "Nữ") return "Nữ"
+    
+    // Convert to lowercase for comparison
+    const genderLower = gender.toLowerCase()
+    if (genderLower === "male" || genderLower === "m" || genderLower === "nam") return "Nam"
+    if (genderLower === "female" || genderLower === "f" || genderLower === "nữ") return "Nữ"
+    if (genderLower === "other" || genderLower === "o" || genderLower === "khác") return "Khác"
+    
     return gender
   }
 
@@ -727,10 +730,6 @@ const ChartTab = ({
                     <h4 className="font-semibold text-gray-900">
                       Đơn thuốc hiện tại ({prescriptions.length} loại)
                     </h4>
-                    <Button onClick={onSavePrescriptions} className="bg-blue-600 hover:bg-blue-700">
-                      <Save className="h-4 w-4 mr-2" />
-                      Lưu đơn thuốc
-                    </Button>
                   </div>
                   <div className="space-y-2">
                     {prescriptions.map((rx, index) => (

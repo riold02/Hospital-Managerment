@@ -29,7 +29,7 @@ interface DoctorKPICardsProps {
 
 export default function DoctorKPICards({ kpiData }: DoctorKPICardsProps) {
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-5 mb-8">
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-5 mb-8">
       {/* Today's Appointments - Light Blue */}
       <Card className="bg-gradient-to-br from-blue-50 to-white rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1 border-0">
         <CardContent className="p-6">
@@ -139,8 +139,8 @@ export default function DoctorKPICards({ kpiData }: DoctorKPICardsProps) {
         </CardContent>
       </Card>
 
-      {/* Messages - Light Teal */}
-      <Card className="bg-gradient-to-br from-teal-50 to-white rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1 border-0">
+      {/* Messages - Light Teal - Hidden: Feature not yet implemented */}
+      {/* <Card className="bg-gradient-to-br from-teal-50 to-white rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1 border-0">
         <CardContent className="p-6">
           <div className="flex items-start justify-between">
             <div className="space-y-2">
@@ -159,7 +159,7 @@ export default function DoctorKPICards({ kpiData }: DoctorKPICardsProps) {
             </div>
           </div>
         </CardContent>
-      </Card>
+      </Card> */}
     </div>
   )
 }
