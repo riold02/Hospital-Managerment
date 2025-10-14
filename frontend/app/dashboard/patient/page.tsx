@@ -7,6 +7,7 @@ import { useState, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
+import { formatAppointmentTime } from "@/lib/utils"
 import {
   Dialog,
   DialogContent,
@@ -112,6 +113,7 @@ export default function PatientDashboard() {
   const router = useRouter()
   const [activeTab, setActiveTab] = useState("overview")
   const [appointments, setAppointments] = useState<Appointment[]>([])
+  const [allAppointments, setAllAppointments] = useState<Appointment[]>([]) // Store all appointments
   const [prescriptions, setPrescriptions] = useState<Prescription[]>([])
   const [medicalHistory, setMedicalHistory] = useState<MedicalRecord[]>([])
   const [billing, setBilling] = useState<Bill[]>([])
@@ -131,8 +133,40 @@ export default function PatientDashboard() {
     date_of_birth: '',
     gender: ''
   })
+  
+  // Appointment filters
+  const [daysFilter, setDaysFilter] = useState<number>(7) // 7 or 30 days
+  const [statusFilter, setStatusFilter] = useState<string>('all') // all, scheduled, confirmed, cancelled, completed
+  
   const { toast } = useToast()
   const { user, logout } = useAuth()
+
+  // Filter appointments based on days and status
+  const filterAppointments = (appointments: Appointment[]) => {
+    const now = new Date()
+    const maxDate = new Date()
+    maxDate.setDate(maxDate.getDate() + daysFilter)
+    
+    return appointments.filter(apt => {
+      // Filter by date range (only future appointments within selected days)
+      const aptDate = new Date(apt.appointment_date || apt.date)
+      const isWithinRange = aptDate >= now && aptDate <= maxDate
+      
+      // Filter by status
+      let matchesStatus = true
+      if (statusFilter !== 'all') {
+        const statusMap: any = {
+          'scheduled': 'Đã lên lịch',
+          'confirmed': 'Đã xác nhận', 
+          'cancelled': 'Đã hủy',
+          'completed': 'Hoàn thành'
+        }
+        matchesStatus = apt.status === statusMap[statusFilter]
+      }
+      
+      return isWithinRange && matchesStatus
+    })
+  }
 
   // Helper functions to safely extract appointment data
   const getDoctorName = (appointment: Appointment): string => {
@@ -191,6 +225,13 @@ export default function PatientDashboard() {
     }
     return '0'
   }
+
+  // Apply filters when filter options change
+  useEffect(() => {
+    if (allAppointments.length > 0) {
+      setAppointments(filterAppointments(allAppointments))
+    }
+  }, [daysFilter, statusFilter, allAppointments])
 
   // Role protection - only allow patients to access this dashboard
   useEffect(() => {
@@ -301,15 +342,27 @@ export default function PatientDashboard() {
               doctor: apt.doctor ? `${apt.doctor.first_name || apt.doctor.firstName || ''} ${apt.doctor.last_name || apt.doctor.lastName || ''}`.trim() : 'N/A',
               department: apt.doctor?.specialty || apt.department || 'N/A',
               date: apt.appointment_date ? new Date(apt.appointment_date).toISOString().split('T')[0] : apt.date,
-              time: apt.appointment_time ? new Date(apt.appointment_time).toTimeString().slice(0, 5) : apt.time,
+              time: formatAppointmentTime(apt.appointment_time) || apt.time,
               purpose: apt.purpose || '',
               status: statusVietnamese[normalizedStatus] || normalizedStatus,
               rawStatus: normalizedStatus, // Keep original for API calls
-              canCancel: normalizedStatus === 'Scheduled' || normalizedStatus === 'Confirmed'
+              canCancel: normalizedStatus === 'Scheduled' || normalizedStatus === 'Confirmed',
+              appointment_date: apt.appointment_date // Keep original date for sorting
             }
           }) : []
           
-          setAppointments(formattedAppointments)
+          // Sort appointments by date - nearest date first (ascending order)
+          const sortedAppointments = formattedAppointments.sort((a, b) => {
+            const dateA = new Date(a.appointment_date || a.date)
+            const dateB = new Date(b.appointment_date || b.date)
+            return dateA.getTime() - dateB.getTime() // Ascending: nearest first
+          })
+          
+          // Store all appointments
+          setAllAppointments(sortedAppointments)
+          
+          // Apply filter
+          setAppointments(filterAppointments(sortedAppointments))
         } catch (error) {
           console.error("[v0] Error fetching patient appointments:", error)
           setAppointments([])
@@ -413,14 +466,22 @@ export default function PatientDashboard() {
         doctor: `${newAppointment.doctor?.first_name || ''} ${newAppointment.doctor?.last_name || ''}`.trim(),
         department: newAppointment.doctor?.specialty || 'N/A',
         date: new Date(newAppointment.appointment_date).toISOString().split('T')[0],
-        time: new Date(newAppointment.appointment_time).toTimeString().slice(0, 5), // Format HH:MM
+        time: formatAppointmentTime(newAppointment.appointment_time),
         purpose: newAppointment.purpose || '',
         status: statusVietnamese[newAppointment.status] || newAppointment.status,
         rawStatus: newAppointment.status, // Keep original for API calls
-        canCancel: newAppointment.status === 'Scheduled' || newAppointment.status === 'Confirmed'
+        canCancel: newAppointment.status === 'Scheduled' || newAppointment.status === 'Confirmed',
+        appointment_date: newAppointment.appointment_date // Keep for sorting
       }
 
-      setAppointments([...appointments, formattedAppointment])
+      // Add new appointment and sort by date (nearest first)
+      const updatedAppointments = [...appointments, formattedAppointment].sort((a: any, b: any) => {
+        const dateA = new Date(a.appointment_date || a.date)
+        const dateB = new Date(b.appointment_date || b.date)
+        return dateA.getTime() - dateB.getTime()
+      })
+      
+      setAppointments(updatedAppointments)
       setIsBookingOpen(false)
       toast({
         title: "Đặt lịch thành công",
@@ -925,6 +986,42 @@ export default function PatientDashboard() {
                       <BookingForm onSubmit={handleBookAppointment} />
                     </DialogContent>
                   </Dialog>
+                </div>
+                
+                {/* Filter Controls */}
+                <div className="flex gap-4 mt-4 flex-wrap">
+                  <div className="flex items-center gap-2">
+                    <Label>Hiển thị:</Label>
+                    <Select value={String(daysFilter)} onValueChange={(value) => setDaysFilter(Number(value))}>
+                      <SelectTrigger className="w-[140px]">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="7">7 ngày tới</SelectItem>
+                        <SelectItem value="30">30 ngày tới</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  
+                  <div className="flex items-center gap-2">
+                    <Label>Trạng thái:</Label>
+                    <Select value={statusFilter} onValueChange={setStatusFilter}>
+                      <SelectTrigger className="w-[160px]">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Tất cả</SelectItem>
+                        <SelectItem value="scheduled">Chưa xác nhận</SelectItem>
+                        <SelectItem value="confirmed">Đã xác nhận</SelectItem>
+                        <SelectItem value="cancelled">Đã hủy</SelectItem>
+                        <SelectItem value="completed">Hoàn thành</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  
+                  <div className="text-sm text-muted-foreground self-center">
+                    Hiển thị {appointments.length} / {allAppointments.length} lịch hẹn
+                  </div>
                 </div>
               </CardHeader>
               <CardContent>

@@ -113,10 +113,13 @@ app.use('/api/v1/appointments', require('./src/routes/appointments'));
 app.use('/api/v1/departments', require('./src/routes/departments'));
 app.use('/api/v1/medical-records', require('./src/routes/medicalRecords'));
 app.use('/api/v1/billing', require('./src/routes/billing'));
+app.use('/api/v1/payment', require('./src/routes/payment')); // Payment gateway integration
+app.use('/api/v1/services', require('./src/routes/services'));
 app.use('/api/v1/staff', require('./src/routes/staff'));
 app.use('/api/v1/medicine', require('./src/routes/medicine'));
 app.use('/api/v1/pharmacy', require('./src/routes/pharmacy'));
 app.use('/api/v1', require('./src/routes/rooms')); // Room types, rooms, and room assignments
+app.use('/api/v1/nurse-assignments', require('./src/routes/nurseAssignments')); // Nurse-patient assignments
 app.use('/api/v1/cleaning-service', require('./src/routes/cleaningService'));
 app.use('/api/v1/prescriptions', require('./src/routes/prescriptions'));
 app.use('/api/v1/ambulances', require('./src/routes/ambulances')); // Ambulances and Driver dashboard

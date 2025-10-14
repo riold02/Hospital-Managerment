@@ -17,7 +17,7 @@ const { authenticateToken, requireStaff, requireRole } = require('../middleware/
  *       200:
  *         description: Pharmacist dashboard data retrieved successfully
  */
-router.get('/pharmacist/dashboard', authenticateToken, requireRole(['pharmacist', 'admin']), pharmacyController.getPharmacistDashboard);
+router.get('/pharmacist/dashboard', authenticateToken, requireRole('pharmacist', 'admin'), pharmacyController.getPharmacistDashboard);
 
 /**
  * @swagger
@@ -42,7 +42,7 @@ router.get('/pharmacist/dashboard', authenticateToken, requireRole(['pharmacist'
  *       200:
  *         description: Pending prescriptions retrieved successfully
  */
-router.get('/prescriptions/pending', authenticateToken, requireRole(['pharmacist', 'admin']), pharmacyController.getPendingPrescriptions);
+router.get('/prescriptions/pending', authenticateToken, requireRole('pharmacist', 'admin'), pharmacyController.getPendingPrescriptions);
 
 /**
  * @swagger
@@ -82,7 +82,7 @@ router.get('/prescriptions/pending', authenticateToken, requireRole(['pharmacist
  *       200:
  *         description: Medicine inventory retrieved successfully
  */
-router.get('/inventory', authenticateToken, requireRole(['pharmacist', 'admin']), pharmacyController.getMedicineInventory);
+router.get('/inventory', authenticateToken, requireRole('pharmacist', 'admin'), pharmacyController.getMedicineInventory);
 
 /**
  * @swagger
@@ -117,7 +117,7 @@ router.get('/inventory', authenticateToken, requireRole(['pharmacist', 'admin'])
  *       200:
  *         description: Medicine stock updated successfully
  */
-router.put('/medicines/:medicineId/stock', authenticateToken, requireRole(['pharmacist', 'admin']), pharmacyController.updateMedicineStock);
+router.put('/medicines/:medicineId/stock', authenticateToken, requireRole('pharmacist', 'admin'), pharmacyController.updateMedicineStock);
 
 /**
  * @swagger
@@ -138,7 +138,7 @@ router.put('/medicines/:medicineId/stock', authenticateToken, requireRole(['phar
  *       200:
  *         description: Expiring medicines retrieved successfully
  */
-router.get('/medicines/expiring', authenticateToken, requireRole(['pharmacist', 'admin']), pharmacyController.getExpiringMedicines);
+router.get('/medicines/expiring', authenticateToken, requireRole('pharmacist', 'admin'), pharmacyController.getExpiringMedicines);
 
 /**
  * @swagger

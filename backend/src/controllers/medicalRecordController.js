@@ -181,14 +181,23 @@ class MedicalRecordController {
         });
       }
 
+      // Get doctor_id from authenticated user or request body
+      let doctorId = req.user.doctor_id || req.body.doctor_id;
+      
+      if (!doctorId) {
+        return res.status(403).json({
+          success: false,
+          error: 'Doctor ID is required. Only doctors can create medical records.'
+        });
+      }
+
       const medicalRecordData = {
-                                                                                                                                             patient_id: Number(req.body.patient_id),
-        doctor_id: Number(req.body.doctor_id),
-        // visit_date is not in schema, using created_at instead
+        patient_id: Number(req.body.patient_id),
+        doctor_id: Number(doctorId),
         diagnosis: req.body.diagnosis,
         treatment: req.body.treatment || null,
-        symptoms: req.body.symptoms || null,
-        notes: req.body.notes || null
+        prescription: req.body.prescription || null,
+        // symptoms and notes removed - not in schema
       };
 
       const data = await prisma.medical_records.create({

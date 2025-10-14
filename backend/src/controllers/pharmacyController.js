@@ -13,20 +13,18 @@ class PharmacyController {
         expiringMedicines,
         recentPrescriptions
       ] = await Promise.all([
-        // Pending prescriptions to dispense
-        prisma.prescription.count({
+        // Pending prescriptions to dispense (Active status)
+        prisma.prescriptions.count({
           where: {
-            pharmacy_records: {
-              none: {}
-            }
+            status: 'Active'
           }
         }),
         
-        // Low stock medicines (stock < 10)
+        // Low stock medicines (stock < 100)
         prisma.medicine.count({
           where: {
             stock_quantity: {
-              lt: 10
+              lt: 100
             }
           }
         }),
@@ -34,7 +32,7 @@ class PharmacyController {
         // Today's dispensed medications
         prisma.pharmacy.count({
           where: {
-            dispensed_date: {
+            prescription_date: {
               gte: new Date(new Date().setHours(0, 0, 0, 0)),
               lt: new Date(new Date().setHours(23, 59, 59, 999))
             }
@@ -54,29 +52,23 @@ class PharmacyController {
         }),
         
         // Recent prescriptions
-        prisma.prescription.findMany({
+        prisma.prescriptions.findMany({
           take: 10,
           orderBy: { created_at: 'desc' },
           include: {
-            appointment: {
-              include: {
-                patient: {
-                  select: {
-                    first_name: true,
-                    last_name: true
-                  }
-                },
-                doctor: {
-                  select: {
-                    first_name: true,
-                    last_name: true
-                  }
-                }
+            patient: {
+              select: {
+                patient_id: true,
+                first_name: true,
+                last_name: true
               }
             },
-            prescription_items: {
-              include: {
-                medicine: true
+            doctor: {
+              select: {
+                doctor_id: true,
+                first_name: true,
+                last_name: true,
+                specialty: true
               }
             }
           }
@@ -107,64 +99,70 @@ class PharmacyController {
     }
   }
 
-  // Get pending prescriptions
+  // Get pending prescriptions (can filter by status)
   async getPendingPrescriptions(req, res) {
     try {
-      const { page = 1, limit = 20 } = req.query;
+      const { page = 1, limit = 20, status } = req.query;
       const offset = (page - 1) * limit;
 
+      // Build where clause
+      const whereClause = {};
+      if (status && status !== 'all') {
+        // Map frontend status to database status
+        if (status === 'Active') {
+          whereClause.status = 'Active';
+        } else if (status === 'Filled') {
+          whereClause.status = 'Filled';
+        } else {
+          whereClause.status = status; // For Cancelled, Expired, Partially_Filled
+        }
+      } else if (!status) {
+        // Default: only show Active (pending) prescriptions
+        whereClause.status = 'Active';
+      }
+      // If status === 'all', whereClause is empty, get all prescriptions
+
       const [prescriptions, total] = await Promise.all([
-        prisma.prescription.findMany({
-          where: {
-            pharmacy_records: {
-              none: {}
-            }
-          },
+        prisma.prescriptions.findMany({
+          where: whereClause,
           include: {
-            appointment: {
-              include: {
-                patient: {
-                  select: {
-                    patient_id: true,
-                    first_name: true,
-                    last_name: true,
-                    date_of_birth: true,
-                    phone_number: true
-                  }
-                },
-                doctor: {
-                  select: {
-                    first_name: true,
-                    last_name: true,
-                    specialty: true
-                  }
-                }
+            patient: {
+              select: {
+                patient_id: true,
+                first_name: true,
+                last_name: true,
+                date_of_birth: true,
+                phone: true
               }
             },
-            prescription_items: {
+            doctor: {
+              select: {
+                doctor_id: true,
+                first_name: true,
+                last_name: true,
+                specialty: true
+              }
+            },
+            items: {
               include: {
                 medicine: {
                   select: {
                     medicine_id: true,
                     name: true,
-                    dosage: true,
-                    unit: true,
+                    type: true,
+                    brand: true,
                     stock_quantity: true
                   }
                 }
               }
             }
           },
-          orderBy: { created_at: 'asc' },
+          orderBy: { created_at: 'desc' }, // Show newest first
           skip: parseInt(offset),
           take: parseInt(limit)
         }),
-        prisma.prescription.count({
-          where: {
-            pharmacy_records: {
-              none: {}
-            }
-          }
+        prisma.prescriptions.count({
+          where: whereClause
         })
       ]);
 
@@ -210,7 +208,7 @@ class PharmacyController {
       
       if (lowStock === 'true') {
         whereClause.stock_quantity = {
-          lt: 10
+          lt: 100
         };
       }
 
@@ -316,76 +314,104 @@ class PharmacyController {
         });
       }
 
-      const { patient_id, medicine_id, quantity, prescription_id } = req.body;
+      const { prescription_id } = req.body;
 
-      // Check if medicine exists and has sufficient stock
-      const medicine = await prisma.medicine.findUnique({
-        where: { medicine_id: Number(medicine_id) },
-        select: { medicine_id: true, name: true, stock_quantity: true }
-      });
-
-      if (!medicine) {
-        return res.status(404).json({
-          success: false,
-          error: 'Medicine not found'
-        });
-      }
-
-      if (medicine.stock_quantity < quantity) {
+      if (!prescription_id) {
         return res.status(400).json({
           success: false,
-          error: `Insufficient stock. Available: ${medicine.stock_quantity}, Requested: ${quantity}`
+          error: 'prescription_id is required'
         });
       }
 
-      // Use transaction to create pharmacy record and update stock
-      const result = await prisma.$transaction(async (tx) => {
-        // Create pharmacy record
-        const pharmacyRecord = await tx.pharmacy.create({
-          data: {
-            patient_id: Number(patient_id),
-            medicine_id: Number(medicine_id),
-            quantity: parseInt(quantity),
-            prescription_id: prescription_id ? Number(prescription_id) : null,
-            dispensed_date: new Date(),
-            dispensed_by: req.user.id // Staff member who dispensed
+      // Get prescription with all items
+      const prescription = await prisma.prescriptions.findUnique({
+        where: { prescription_id: Number(prescription_id) },
+        include: {
+          items: {
+            include: {
+              medicine: true
+            }
           },
-          include: {
-            patient: {
-              select: {
-                patient_id: true,
-                first_name: true,
-                last_name: true,
-                email: true
-              }
-            },
-            medicine: {
-              select: {
-                medicine_id: true,
-                name: true,
-                type: true,
-                brand: true
-              }
-            },
-            staff: {
-              select: {
-                staff_id: true,
-                first_name: true,
-                last_name: true
-              }
+          patient: {
+            select: {
+              patient_id: true,
+              first_name: true,
+              last_name: true
             }
           }
+        }
+      });
+
+      if (!prescription) {
+        return res.status(404).json({
+          success: false,
+          error: 'Prescription not found'
+        });
+      }
+
+      if (prescription.status === 'Filled') {
+        return res.status(400).json({
+          success: false,
+          error: 'Đơn thuốc này đã được cấp phát rồi. Không thể cấp phát lại!'
+        });
+      }
+
+      // Check stock for all items
+      const stockChecks = prescription.items.map(item => {
+        if (item.medicine.stock_quantity < item.quantity) {
+          return {
+            valid: false,
+            medicine_name: item.medicine.name,
+            stock: item.medicine.stock_quantity,
+            required: item.quantity
+          };
+        }
+        return { valid: true };
+      });
+
+      const insufficientStock = stockChecks.find(check => !check.valid);
+      if (insufficientStock) {
+        return res.status(400).json({
+          success: false,
+          error: `Không đủ thuốc "${insufficientStock.medicine_name}" trong kho. Tồn kho: ${insufficientStock.stock}, Yêu cầu: ${insufficientStock.required}`
+        });
+      }
+
+      // Use transaction to dispense all items
+      const result = await prisma.$transaction(async (tx) => {
+        const pharmacyRecords = [];
+
+        // Create pharmacy record for each item and update stock
+        for (const item of prescription.items) {
+          // Create pharmacy record
+          const pharmacyRecord = await tx.pharmacy.create({
+            data: {
+              patient_id: prescription.patient_id,
+              medicine_id: item.medicine_id,
+              quantity: item.quantity,
+              dispensed_by_user_id: req.user.user_id,
+              prescription_date: new Date()
+            }
+          });
+
+          pharmacyRecords.push(pharmacyRecord);
+
+          // Update medicine stock
+          await tx.medicine.update({
+            where: { medicine_id: item.medicine_id },
+            data: { 
+              stock_quantity: item.medicine.stock_quantity - item.quantity
+            }
+          });
+        }
+
+        // Update prescription status to Filled
+        await tx.prescriptions.update({
+          where: { prescription_id: Number(prescription_id) },
+          data: { status: 'Filled' }
         });
 
-        // Update medicine stock
-        await tx.medicine.update({
-          where: { medicine_id: Number(medicine_id) },
-          data: { 
-            stock_quantity: medicine.stock_quantity - quantity
-          }
-        });
-
-        return pharmacyRecord;
+        return pharmacyRecords;
       });
 
       res.status(201).json({
@@ -413,7 +439,7 @@ class PharmacyController {
         dispensed_by,
         date_from,
         date_to,
-        sortBy = 'dispensed_date', 
+        sortBy = 'prescription_date', 
         sortOrder = 'desc' 
       } = req.query;
       
@@ -422,9 +448,9 @@ class PharmacyController {
       const where = {
         ...(patient_id ? { patient_id: Number(patient_id) } : {}),
         ...(medicine_id ? { medicine_id: Number(medicine_id) } : {}),
-        ...(dispensed_by ? { dispensed_by: Number(dispensed_by) } : {}),
+        ...(dispensed_by ? { dispensed_by_user_id: dispensed_by } : {}),
         ...(date_from || date_to ? {
-          dispensed_date: {
+          prescription_date: {
             ...(date_from ? { gte: new Date(date_from) } : {}),
             ...(date_to ? { lte: new Date(date_to) } : {})
           }
@@ -441,7 +467,7 @@ class PharmacyController {
                 first_name: true,
                 last_name: true,
                 email: true,
-                contact_number: true
+                phone: true
               }
             },
             medicine: {
@@ -452,11 +478,17 @@ class PharmacyController {
                 brand: true
               }
             },
-            staff: {
+            dispensed_by_user: {
               select: {
-                staff_id: true,
-                first_name: true,
-                last_name: true
+                user_id: true,
+                email: true,
+                staff_member: {
+                  select: {
+                    staff_id: true,
+                    first_name: true,
+                    last_name: true
+                  }
+                }
               }
             }
           },

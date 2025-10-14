@@ -17,27 +17,114 @@ class BillingController {
       const billingData = {
         patient_id: Number(req.body.patient_id),
         appointment_id: req.body.appointment_id ? Number(req.body.appointment_id) : null,
+        medical_record_id: req.body.medical_record_id ? Number(req.body.medical_record_id) : null,
         processed_by_user_id: req.user?.user_id || null,
+        billing_date: req.body.billing_date ? new Date(req.body.billing_date) : new Date(), // Always set billing_date
         total_amount: parseFloat(req.body.total_amount),
-        payment_status: req.body.payment_status || 'Pending',
+        payment_status: req.body.payment_status || 'PENDING',
         payment_date: req.body.payment_date ? new Date(req.body.payment_date) : null,
-        insurance_provider: req.body.insurance_provider || null
+        payment_method: req.body.payment_method || null
       };
 
-      const data = await prisma.billing.create({
-        data: billingData,
-        include: {
-          patient: {
-            select: {
-              patient_id: true,
-              first_name: true,
-              last_name: true,
-              email: true,
-              phone: true
+      // If billing_items are provided, create them in a transaction
+      let data;
+      if (req.body.billing_items && Array.isArray(req.body.billing_items) && req.body.billing_items.length > 0) {
+        data = await prisma.$transaction(async (tx) => {
+          // Create billing record
+          const billing = await tx.billing.create({
+            data: billingData
+          });
+
+          // Fetch service details and create billing items
+          const billingItems = await Promise.all(
+            req.body.billing_items.map(async (item) => {
+              const service = await tx.services.findUnique({
+                where: { service_id: Number(item.service_id) },
+                select: { service_name: true }
+              });
+
+              return {
+                bill_id: billing.bill_id,
+                service_id: Number(item.service_id),
+                item_description: service?.service_name || 'Dịch vụ y tế',
+                quantity: Number(item.quantity),
+                unit_price: parseFloat(item.unit_price),
+                total_amount: parseFloat(item.total_amount)
+              };
+            })
+          );
+
+          await tx.billing_items.createMany({
+            data: billingItems
+          });
+
+          // Fetch complete billing with relations
+          return await tx.billing.findUnique({
+            where: { bill_id: billing.bill_id },
+            include: {
+              patient: {
+                select: {
+                  patient_id: true,
+                  first_name: true,
+                  last_name: true,
+                  email: true,
+                  phone: true
+                }
+              },
+              medical_record: {
+                select: {
+                  record_id: true,
+                  diagnosis: true,
+                  treatment: true,
+                  doctor: {
+                    select: {
+                      user_id: true,
+                      first_name: true,
+                      last_name: true
+                    }
+                  }
+                }
+              },
+              items: {
+                include: {
+                  service: {
+                    select: {
+                      service_id: true,
+                      service_name: true,
+                      service_code: true,
+                      category: true,
+                      unit_price: true
+                    }
+                  }
+                }
+              }
+            }
+          });
+        });
+      } else {
+        // Create billing without items
+        data = await prisma.billing.create({
+          data: billingData,
+          include: {
+            patient: {
+              select: {
+                patient_id: true,
+                first_name: true,
+                last_name: true,
+                email: true,
+                phone: true
+              }
+            },
+            medical_record: {
+              select: {
+                record_id: true,
+                diagnosis: true,
+                treatment: true
+              }
             }
           }
-        }
-      });
+        });
+      }
 
       res.status(201).json({
         success: true,
@@ -97,6 +184,26 @@ class BillingController {
                 email: true,
                 phone: true
               }
+            },
+            medical_record: {
+              select: {
+                record_id: true,
+                diagnosis: true,
+                treatment: true
+              }
+            },
+            items: {
+              include: {
+                service: {
+                  select: {
+                    service_id: true,
+                    service_name: true,
+                    service_code: true,
+                    category: true,
+                    unit_price: true
+                  }
+                }
+              }
             }
           },
           orderBy: { [sortBy]: sortOrder === 'asc' ? 'asc' : 'desc' },
@@ -139,7 +246,7 @@ class BillingController {
       const { id } = req.params;
 
       const data = await prisma.billing.findUnique({
-        where: { billing_id: Number(id) },
+        where: { bill_id: Number(id) },
         include: {
           patient: {
             select: {
@@ -149,6 +256,39 @@ class BillingController {
               email: true,
               phone: true,
               address: true
+            }
+          },
+          medical_record: {
+            select: {
+              record_id: true,
+              diagnosis: true,
+              treatment: true,
+              doctor: {
+                select: {
+                  user_id: true,
+                  first_name: true,
+                  last_name: true
+                }
+              }
+            }
+          },
+          items: {
+            include: {
+              service: {
+                select: {
+                  service_id: true,
+                  service_name: true,
+                  service_code: true,
+                  category: true,
+                  unit_price: true,
+                  description: true
+                }
+              }
+            }
+          },
+          payment_transactions: {
+            orderBy: {
+              created_at: 'desc'
             }
           }
         }
@@ -193,20 +333,19 @@ class BillingController {
         processed_by_user_id: req.body.processed_by_user_id || undefined,
         total_amount: req.body.total_amount ? parseFloat(req.body.total_amount) : undefined,
         payment_status: req.body.payment_status,
-        payment_date: req.body.payment_date ? new Date(req.body.payment_date) : undefined,
-        insurance_provider: req.body.insurance_provider
+        payment_date: req.body.payment_date ? new Date(req.body.payment_date) : undefined
       };
 
       // Remove undefined values
       Object.keys(updateData).forEach(key => updateData[key] === undefined && delete updateData[key]);
 
-      // If payment status is being updated to Paid, set payment date
-      if (updateData.payment_status === 'Paid' && !updateData.payment_date) {
+      // If payment status is being updated to PAID, set payment date
+      if (updateData.payment_status === 'PAID' && !updateData.payment_date) {
         updateData.payment_date = new Date();
       }
 
       const data = await prisma.billing.update({
-        where: { billing_id: Number(id) },
+        where: { bill_id: Number(id) },
         data: updateData,
         include: {
           patient: {
@@ -241,7 +380,7 @@ class BillingController {
       const { id } = req.params;
 
       await prisma.billing.delete({
-        where: { billing_id: Number(id) }
+        where: { bill_id: Number(id) }
       });
 
       res.json({
@@ -279,13 +418,13 @@ class BillingController {
       const stats = data.reduce((acc, bill) => {
         acc.totalRevenue += parseFloat(bill.total_amount || 0);
         
-        if (bill.payment_status === 'Paid') {
+        if (bill.payment_status === 'PAID') {
           acc.paidAmount += parseFloat(bill.total_amount || 0);
           acc.paidCount++;
-        } else if (bill.payment_status === 'Pending') {
+        } else if (bill.payment_status === 'PENDING') {
           acc.pendingAmount += parseFloat(bill.total_amount || 0);
           acc.pendingCount++;
-        } else if (bill.payment_status === 'Overdue') {
+        } else if (bill.payment_status === 'OVERDUE') {
           acc.overdueAmount += parseFloat(bill.total_amount || 0);
           acc.overdueCount++;
         }

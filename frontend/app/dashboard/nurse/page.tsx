@@ -8,7 +8,9 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { toast } from "@/hooks/use-toast"
+import { formatAppointmentTime } from "@/lib/utils"
 import {
   Activity,
   Heart,
@@ -26,41 +28,22 @@ import {
   Bed,
   ClipboardList,
   Clock,
-  Eye
+  Eye,
+  CheckCircle2,
+  Loader2
 } from "lucide-react"
 import { useAuth } from "@/lib/auth-context"
-import { nurseApi, NurseDashboardData, PatientAssignment, VitalSigns, appointmentsApi, Appointment } from "@/lib/api"
+import { nurseApi, NurseDashboardData, PatientAssignment, VitalSigns, appointmentsApi, Appointment, billingApi, BillingRecord, CreateBillingData, roomsApi, Room, RoomAssignment, patientsApi, Patient } from "@/lib/api"
 import { useRouter } from "next/navigation"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog"
-import { CheckCircle, XCircle } from "lucide-react"
+import { CheckCircle, XCircle, DollarSign } from "lucide-react"
+import EnhancedBillingForm from "@/components/nurse/EnhancedBillingForm"
+import RoomManagementTab from "@/components/nurse/RoomManagementTab"
+import PatientListTab from "@/components/nurse/PatientListTab"
+import ShiftScheduleTab from "@/components/nurse/ShiftScheduleTab"
 
 // Helper function to format time
-const formatTime = (timeValue: string | Date | null | undefined): string => {
-  if (!timeValue) return 'Chưa có giờ';
-  
-  try {
-    // If it's already a string in HH:MM format, return it
-    if (typeof timeValue === 'string' && /^\d{2}:\d{2}/.test(timeValue)) {
-      return timeValue.substring(0, 5); // Return HH:MM only
-    }
-    
-    // If it's a Date object or ISO string, extract time
-    const date = new Date(timeValue);
-    if (!isNaN(date.getTime())) {
-      return date.toLocaleTimeString('vi-VN', { 
-        hour: '2-digit', 
-        minute: '2-digit',
-        hour12: false 
-      });
-    }
-    
-    return 'Chưa có giờ';
-  } catch (error) {
-    console.error('Error formatting time:', error);
-    return 'Chưa có giờ';
-  }
-};
+// Use formatAppointmentTime from utils for consistent time handling
 
 // Helper function to get status info - API trả về PascalCase
 const getStatusInfo = (status: string) => {
@@ -90,7 +73,9 @@ export default function NurseDashboard() {
   const [pendingAppointments, setPendingAppointments] = useState<Appointment[]>([])
   const [allAppointments, setAllAppointments] = useState<Appointment[]>([])
   
-  // Appointment Filter States
+  // Appointment Filter States - Enhanced
+  const [daysFilter, setDaysFilter] = useState<number>(7) // 7 or 30 days
+  const [statusFilter, setStatusFilter] = useState<string>('all') // all, scheduled, confirmed, cancelled, completed
   const [appointmentFilter, setAppointmentFilter] = useState<"all" | "unconfirmed" | "confirmed">("unconfirmed")
   const [selectedDate, setSelectedDate] = useState<string>(new Date().toISOString().split('T')[0]) // Default to today
   
@@ -111,6 +96,21 @@ export default function NurseDashboard() {
     notes: ""
   })
 
+  // Billing States
+  const [billingRecords, setBillingRecords] = useState<BillingRecord[]>([])
+  const [filteredBillingRecords, setFilteredBillingRecords] = useState<BillingRecord[]>([])
+  const [showAddBillingDialog, setShowAddBillingDialog] = useState(false)
+  const [confirmingBill, setConfirmingBill] = useState<number | null>(null)
+  const [billingStatusFilter, setBillingStatusFilter] = useState<string>('all')
+  const [billingPaymentMethodFilter, setBillingPaymentMethodFilter] = useState<string>('all')
+  const [billingSortBy, setBillingSortBy] = useState<'date' | 'amount'>('date')
+  const [billingSortOrder, setBillingSortOrder] = useState<'asc' | 'desc'>('desc')
+
+  // Room Management States
+  const [rooms, setRooms] = useState<Room[]>([])
+  const [roomAssignments, setRoomAssignments] = useState<RoomAssignment[]>([])
+  const [allPatients, setAllPatients] = useState<Patient[]>([])
+
   useEffect(() => {
     setMounted(true)
   }, [])
@@ -120,6 +120,40 @@ export default function NurseDashboard() {
       loadDashboardData()
     }
   }, [user])
+
+  // Filter and sort billing records
+  useEffect(() => {
+    let filtered = [...billingRecords]
+
+    // Filter by status
+    if (billingStatusFilter !== 'all') {
+      filtered = filtered.filter(bill => 
+        bill.payment_status?.toUpperCase() === billingStatusFilter.toUpperCase()
+      )
+    }
+
+    // Filter by payment method
+    if (billingPaymentMethodFilter !== 'all') {
+      filtered = filtered.filter(bill => 
+        bill.payment_method?.toUpperCase() === billingPaymentMethodFilter.toUpperCase()
+      )
+    }
+
+    // Sort
+    filtered.sort((a, b) => {
+      if (billingSortBy === 'date') {
+        const dateA = new Date(a.created_at).getTime()
+        const dateB = new Date(b.created_at).getTime()
+        return billingSortOrder === 'desc' ? dateB - dateA : dateA - dateB
+      } else {
+        const amountA = Number(a.total_amount)
+        const amountB = Number(b.total_amount)
+        return billingSortOrder === 'desc' ? amountB - amountA : amountA - amountB
+      }
+    })
+
+    setFilteredBillingRecords(filtered)
+  }, [billingRecords, billingStatusFilter, billingPaymentMethodFilter, billingSortBy, billingSortOrder])
 
   const loadDashboardData = async () => {
     setLoading(true)
@@ -163,7 +197,35 @@ export default function NurseDashboard() {
             )
             setPendingAppointments(pending)
           })
-          .catch(err => console.error('Appointments API error:', err))
+          .catch(err => console.error('Appointments API error:', err)),
+
+        // Load billing records
+        billingApi.getAllBilling({ limit: 50 })
+          .then(response => {
+            setBillingRecords(response.data)
+          })
+          .catch(err => console.error('Billing API error:', err)),
+
+        // Load rooms
+        roomsApi.getAllRooms({ limit: 100 })
+          .then(response => {
+            setRooms(response.data)
+          })
+          .catch(err => console.error('Rooms API error:', err)),
+
+        // Load room assignments
+        roomsApi.getAllRoomAssignments({ limit: 100, active_only: true })
+          .then(response => {
+            setRoomAssignments(response.data)
+          })
+          .catch(err => console.error('Room Assignments API error:', err)),
+
+        // Load all patients (for assigning to rooms)
+        patientsApi.getAllPatients({ limit: 100 })
+          .then(response => {
+            setAllPatients(response.data)
+          })
+          .catch(err => console.error('Patients API error:', err))
       ])
 
       console.log('Nurse dashboard data loaded successfully')
@@ -266,6 +328,42 @@ export default function NurseDashboard() {
     }
   }
 
+  const loadBillingRecords = async () => {
+    try {
+      const response = await billingApi.getAllBilling({ limit: 50 })
+      setBillingRecords(response.data)
+    } catch (error) {
+      console.error("Error loading billing records:", error)
+    }
+  }
+
+  const handleConfirmCashPayment = async (billId: number) => {
+    try {
+      setConfirmingBill(billId)
+      
+      await billingApi.updateBilling(billId, {
+        payment_status: 'PAID'
+      })
+      
+      toast({
+        title: "Thành công",
+        description: "Đã xác nhận thanh toán tiền mặt",
+      })
+      
+      // Refresh billing records
+      await loadBillingRecords()
+    } catch (error) {
+      console.error("Error confirming payment:", error)
+      toast({
+        title: "Lỗi",
+        description: "Không thể xác nhận thanh toán",
+        variant: "destructive",
+      })
+    } finally {
+      setConfirmingBill(null)
+    }
+  }
+
   const handleCancelAppointment = async (appointment: Appointment) => {
     if (!confirm("Bạn có chắc muốn hủy lịch hẹn này?")) return
     
@@ -299,27 +397,49 @@ export default function NurseDashboard() {
     }
   }
 
-  // Computed: Filter appointments based on selected filter and date
-  const filteredAppointments = (() => {
-    // First filter by date - Handle timezone properly (Vietnam UTC+7)
-    let dateFiltered = allAppointments.filter((apt: Appointment) => {
-      // Parse appointment date in local timezone (Vietnam)
-      const aptDate = apt.appointment_date.split('T')[0] // Get YYYY-MM-DD part directly
-      return aptDate === selectedDate
-    })
-    
-    // Then filter by status
-    if (appointmentFilter === "all") {
-      return dateFiltered
-    } else if (appointmentFilter === "unconfirmed") {
-      return dateFiltered.filter((apt: Appointment) => apt.status === 'Scheduled')
-    } else if (appointmentFilter === "confirmed") {
-      return dateFiltered.filter((apt: Appointment) => apt.status === 'Confirmed')
-    }
-    return dateFiltered
-  })()
-  
-  // Count for badges - filter by date first, then status (Handle timezone)
+
+
+  // Filter appointments by date range and status
+  const filterAppointments = (appointments: Appointment[]) => {
+    const now = new Date();
+    now.setHours(0, 0, 0, 0); // Start of today
+
+    return appointments.filter((apt: Appointment) => {
+      const aptDate = new Date(apt.appointment_date);
+      aptDate.setHours(0, 0, 0, 0);
+
+      // Date filter based on daysFilter value
+      if (daysFilter > 0) {
+        // Forward looking: from now to now + daysFilter
+        const maxDate = new Date(now);
+        maxDate.setDate(maxDate.getDate() + daysFilter);
+        if (aptDate < now || aptDate > maxDate) return false;
+      } else if (daysFilter < 0) {
+        // Backward looking: from now + daysFilter to now
+        const minDate = new Date(now);
+        minDate.setDate(minDate.getDate() + daysFilter); // daysFilter is negative
+        if (aptDate < minDate || aptDate > now) return false;
+      }
+      // if daysFilter === 0, show all dates
+
+      // Status filter
+      if (statusFilter === 'all') return true;
+      if (statusFilter === 'scheduled') return apt.status === 'Scheduled';
+      if (statusFilter === 'confirmed') return apt.status === 'Confirmed';
+      if (statusFilter === 'cancelled') return apt.status === 'Cancelled';
+      if (statusFilter === 'completed') return apt.status === 'Completed';
+      return true;
+    });
+  };
+
+  const filteredAppointments = filterAppointments(allAppointments);
+
+  // Reapply filters when filter options change
+  useEffect(() => {
+    filterAppointments(allAppointments);
+  }, [daysFilter, statusFilter]);
+
+  // Count for badges - filter by selected date (keep existing functionality)
   const appointmentsOnSelectedDate = allAppointments.filter((apt: Appointment) => {
     const aptDate = apt.appointment_date.split('T')[0] // Get YYYY-MM-DD part directly
     return aptDate === selectedDate
@@ -361,10 +481,13 @@ export default function NurseDashboard() {
         <nav className="flex-1 p-4 space-y-2">
           {[
             { value: "overview", label: "Tổng quan", icon: Home },
-            { value: "appointments", label: "Lịch hẹn", icon: Calendar, badge: "Mới" },
-            { value: "assignments", label: "Phân công", icon: Users },
+            { value: "patients", label: "Bệnh nhân phụ trách", icon: Users },
+            { value: "appointments", label: "Lịch hẹn", icon: Calendar },
+            { value: "shifts", label: "Lịch ca trực", icon: Clock },
+            { value: "rooms", label: "Phòng trực", icon: Bed },
             { value: "vital-signs", label: "Sinh hiệu", icon: Activity },
             { value: "medication", label: "Thuốc", icon: Pill },
+            { value: "billing", label: "Thanh toán", icon: DollarSign },
             { value: "care-plan", label: "Kế hoạch chăm sóc", icon: FileText },
           ].map((tab) => {
             const Icon = tab.icon
@@ -400,12 +523,9 @@ export default function NurseDashboard() {
         <div className="border-t border-gray-200">
           <div className="p-4 bg-gray-50">
             <div className="flex items-center gap-3">
-              <Avatar className="h-8 w-8">
-                <AvatarImage src="/placeholder-user.jpg" alt="Nurse Avatar" />
-                <AvatarFallback>
-                  <User className="h-4 w-4" />
-                </AvatarFallback>
-              </Avatar>
+              <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
+                <User className="h-5 w-5 text-blue-600" />
+              </div>
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium text-gray-900 truncate">
                   {user?.full_name || user?.email || "Y tá"}
@@ -440,10 +560,14 @@ export default function NurseDashboard() {
             <div>
               <h2 className="text-xl font-bold text-gray-900">
                 {activeTab === "overview" && "Tổng quan"}
+                {activeTab === "patients" && "Bệnh nhân phụ trách"}
                 {activeTab === "appointments" && "Duyệt lịch hẹn"}
+                {activeTab === "shifts" && "Lịch ca trực"}
                 {activeTab === "assignments" && "Phân công bệnh nhân"}
+                {activeTab === "rooms" && "Quản lý phòng trực"}
                 {activeTab === "vital-signs" && "Sinh hiệu"}
                 {activeTab === "medication" && "Thuốc"}
+                {activeTab === "billing" && "Quản lý thanh toán"}
                 {activeTab === "care-plan" && "Kế hoạch chăm sóc"}
               </h2>
               {mounted && (
@@ -567,67 +691,50 @@ export default function NurseDashboard() {
               </Card>
             </TabsContent>
 
+            {/* Patients Tab */}
+            <TabsContent value="patients" className="space-y-6">
+              <PatientListTab onRefresh={loadDashboardData} />
+            </TabsContent>
+
             {/* Appointments Tab - WITH FILTER */}
             <TabsContent value="appointments" className="space-y-6">
               {/* Filter Controls */}
               <Card>
                 <CardContent className="pt-6">
-                  <div className="space-y-4">
-                    {/* Date Filter */}
-                    <div className="flex items-center gap-3">
-                      <Label className="font-semibold min-w-[120px]">Ngày khám:</Label>
-                      <Input 
-                        type="date" 
-                        value={selectedDate}
-                        onChange={(e) => setSelectedDate(e.target.value)}
-                        className="max-w-[200px]"
-                      />
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => setSelectedDate(new Date().toISOString().split('T')[0])}
-                      >
-                        Hôm nay
-                      </Button>
+                  <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-2">
+                      <Label className="font-semibold">Thời gian:</Label>
+                      <Select value={daysFilter.toString()} onValueChange={(value) => setDaysFilter(Number(value))}>
+                        <SelectTrigger className="w-[200px]">
+                          <SelectValue placeholder="Chọn khoảng thời gian" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="-30">30 ngày trước</SelectItem>
+                          <SelectItem value="-7">7 ngày trước</SelectItem>
+                          <SelectItem value="7">7 ngày tới</SelectItem>
+                          <SelectItem value="30">30 ngày tới</SelectItem>
+                        </SelectContent>
+                      </Select>
                     </div>
                     
-                    {/* Status Filter */}
-                    <div className="flex items-center gap-3">
-                      <Label className="font-semibold min-w-[120px]">Trạng thái:</Label>
-                      <div className="flex gap-2">
-                        <Button
-                          size="sm"
-                          variant={appointmentFilter === "unconfirmed" ? "default" : "outline"}
-                          onClick={() => setAppointmentFilter("unconfirmed")}
-                          className={appointmentFilter === "unconfirmed" ? "bg-blue-600" : ""}
-                        >
-                          Chưa xác nhận
-                          <Badge variant="secondary" className="ml-2 bg-white text-blue-600">
-                            {unconfirmedCount}
-                          </Badge>
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant={appointmentFilter === "confirmed" ? "default" : "outline"}
-                          onClick={() => setAppointmentFilter("confirmed")}
-                          className={appointmentFilter === "confirmed" ? "bg-purple-600" : ""}
-                        >
-                          Đã xác nhận
-                          <Badge variant="secondary" className="ml-2 bg-white text-purple-600">
-                            {confirmedCount}
-                          </Badge>
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant={appointmentFilter === "all" ? "default" : "outline"}
-                          onClick={() => setAppointmentFilter("all")}
-                        >
-                          Tất cả
-                          <Badge variant="secondary" className="ml-2">
-                            {appointmentsOnSelectedDate.length}
-                          </Badge>
-                        </Button>
-                      </div>
+                    <div className="flex items-center gap-2">
+                      <Label className="font-semibold">Trạng thái:</Label>
+                      <Select value={statusFilter} onValueChange={setStatusFilter}>
+                        <SelectTrigger className="w-[200px]">
+                          <SelectValue placeholder="Chọn trạng thái" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">Tất cả</SelectItem>
+                          <SelectItem value="scheduled">Chưa xác nhận</SelectItem>
+                          <SelectItem value="confirmed">Đã xác nhận</SelectItem>
+                          <SelectItem value="cancelled">Đã hủy</SelectItem>
+                          <SelectItem value="completed">Đã hoàn thành</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="ml-auto text-sm text-muted-foreground">
+                      Hiển thị <span className="font-semibold text-primary">{filteredAppointments.length}</span> / <span className="font-semibold">{allAppointments.length}</span> lịch hẹn
                     </div>
                   </div>
                 </CardContent>
@@ -639,16 +746,11 @@ export default function NurseDashboard() {
                   <div className="flex items-center justify-between">
                     <CardTitle className="flex items-center gap-2">
                       <Calendar className="h-5 w-5 text-orange-600" />
-                      {appointmentFilter === "unconfirmed" && "Danh sách lịch hẹn chưa xác nhận"}
-                      {appointmentFilter === "confirmed" && "Danh sách lịch hẹn đã xác nhận"}
-                      {appointmentFilter === "all" && "Tất cả lịch hẹn"}
+                      Danh sách lịch hẹn
                       <Badge variant="secondary" className="ml-2">
                         {filteredAppointments.length} lịch hẹn
                       </Badge>
                     </CardTitle>
-                    <div className="text-sm text-muted-foreground">
-                      Ngày: <span className="font-semibold">{new Date(selectedDate).toLocaleDateString('vi-VN', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</span>
-                    </div>
                   </div>
                 </CardHeader>
                 <CardContent>
@@ -681,7 +783,7 @@ export default function NurseDashboard() {
                                   </div>
                                   <div className="flex items-center gap-2">
                                     <Clock className="h-4 w-4" />
-                                    <span>{formatTime(appointment.appointment_time)}</span>
+                                    <span>{formatAppointmentTime(appointment.appointment_time)}</span>
                                   </div>
                                   <div className="flex items-center gap-2">
                                     <Stethoscope className="h-4 w-4" />
@@ -735,19 +837,20 @@ export default function NurseDashboard() {
                     <div className="text-center py-12 text-gray-500">
                       <Calendar className="h-16 w-16 mx-auto mb-4 opacity-50" />
                       <p className="text-lg font-medium mb-1">
-                        {appointmentFilter === "unconfirmed" && "Không có lịch hẹn chưa xác nhận"}
-                        {appointmentFilter === "confirmed" && "Không có lịch hẹn đã xác nhận"}
-                        {appointmentFilter === "all" && "Không có lịch hẹn nào"}
+                        Không có lịch hẹn
                       </p>
                       <p className="text-sm">
-                        {appointmentFilter === "unconfirmed" && "Tất cả lịch hẹn đã được xác nhận"}
-                        {appointmentFilter === "confirmed" && "Chưa có lịch hẹn được xác nhận"}
-                        {appointmentFilter === "all" && "Chưa có dữ liệu"}
+                        Không có lịch hẹn nào khớp với bộ lọc đã chọn
                       </p>
                     </div>
                   )}
                 </CardContent>
               </Card>
+            </TabsContent>
+
+            {/* Shifts Tab */}
+            <TabsContent value="shifts" className="space-y-6">
+              <ShiftScheduleTab onRefresh={loadDashboardData} />
             </TabsContent>
 
             {/* Vital Signs Tab */}
@@ -875,9 +978,190 @@ export default function NurseDashboard() {
                 </CardContent>
               </Card>
             </TabsContent>
+
+            {/* Billing Tab */}
+            <TabsContent value="billing" className="space-y-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-lg font-semibold">Quản lý Hóa đơn</h3>
+                  <p className="text-sm text-gray-500">Tạo và theo dõi hóa đơn thanh toán của bệnh nhân</p>
+                </div>
+                <Button onClick={() => setShowAddBillingDialog(true)} className="bg-blue-600 hover:bg-blue-700">
+                  <Plus className="h-4 w-4 mr-2" />
+                  Lập hóa đơn mới
+                </Button>
+              </div>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <DollarSign className="h-5 w-5 text-green-600" />
+                    Danh sách hóa đơn ({filteredBillingRecords.length}/{billingRecords.length})
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {/* Filter and Sort Controls */}
+                  <div className="flex flex-wrap gap-4 mb-4 p-4 bg-gray-50 rounded-lg">
+                    <div className="flex-1 min-w-[200px]">
+                      <Label className="text-xs mb-1">Trạng thái</Label>
+                      <Select value={billingStatusFilter} onValueChange={setBillingStatusFilter}>
+                        <SelectTrigger className="h-9">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">Tất cả</SelectItem>
+                          <SelectItem value="PENDING">Đang chờ</SelectItem>
+                          <SelectItem value="PAID">Đã thanh toán</SelectItem>
+                          <SelectItem value="OVERDUE">Quá hạn</SelectItem>
+                          <SelectItem value="CANCELLED">Đã hủy</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="flex-1 min-w-[200px]">
+                      <Label className="text-xs mb-1">Phương thức</Label>
+                      <Select value={billingPaymentMethodFilter} onValueChange={setBillingPaymentMethodFilter}>
+                        <SelectTrigger className="h-9">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">Tất cả</SelectItem>
+                          <SelectItem value="CASH">Tiền mặt</SelectItem>
+                          <SelectItem value="TRANSFER">Chuyển khoản</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="flex-1 min-w-[150px]">
+                      <Label className="text-xs mb-1">Sắp xếp theo</Label>
+                      <Select value={billingSortBy} onValueChange={(val: 'date' | 'amount') => setBillingSortBy(val)}>
+                        <SelectTrigger className="h-9">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="date">Ngày tạo</SelectItem>
+                          <SelectItem value="amount">Số tiền</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="flex-1 min-w-[120px]">
+                      <Label className="text-xs mb-1">Thứ tự</Label>
+                      <Select value={billingSortOrder} onValueChange={(val: 'asc' | 'desc') => setBillingSortOrder(val)}>
+                        <SelectTrigger className="h-9">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="desc">Giảm dần</SelectItem>
+                          <SelectItem value="asc">Tăng dần</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+
+                  <div className="space-y-4">
+                    {filteredBillingRecords && filteredBillingRecords.length > 0 ? filteredBillingRecords.slice(0, 10).map((bill) => (
+                      <div key={bill.bill_id} className="flex items-center justify-between p-4 rounded-lg border hover:bg-gray-50">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="font-semibold">#{bill.bill_id}</span>
+                            <Badge className={
+                              bill.payment_status?.toUpperCase() === 'PAID' ? 'bg-green-100 text-green-800' :
+                              bill.payment_status?.toUpperCase() === 'PENDING' ? 'bg-yellow-100 text-yellow-800' :
+                              bill.payment_status?.toUpperCase() === 'OVERDUE' ? 'bg-red-100 text-red-800' :
+                              'bg-gray-100 text-gray-800'
+                            }>
+                              {bill.payment_status?.toUpperCase() === 'PAID' ? 'Đã thanh toán' :
+                               bill.payment_status?.toUpperCase() === 'PENDING' ? 'Đang chờ' :
+                               bill.payment_status?.toUpperCase() === 'OVERDUE' ? 'Quá hạn' :
+                               bill.payment_status?.toUpperCase() === 'CANCELLED' ? 'Đã hủy' : bill.payment_status}
+                            </Badge>
+                            {bill.payment_method?.toUpperCase() === 'CASH' && (
+                              <Badge variant="outline" className="text-xs">Tiền mặt</Badge>
+                            )}
+                          </div>
+                          <p className="text-sm text-gray-600">
+                            Bệnh nhân: {bill.patient?.first_name} {bill.patient?.last_name}
+                          </p>
+                          <p className="text-sm text-gray-500">
+                            Ngày tạo: {new Date(bill.created_at).toLocaleDateString('vi-VN')}
+                          </p>
+                        </div>
+                        <div className="text-right flex flex-col items-end gap-2">
+                          <p className="text-xl font-bold text-blue-600">
+                            {new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(bill.total_amount)}
+                          </p>
+                          {bill.payment_method?.toUpperCase() === 'CASH' && 
+                           bill.payment_status?.toUpperCase() === 'PENDING' && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="text-green-600 border-green-600 hover:bg-green-50"
+                              onClick={() => handleConfirmCashPayment(bill.bill_id)}
+                              disabled={confirmingBill === bill.bill_id}
+                            >
+                              {confirmingBill === bill.bill_id ? (
+                                <>
+                                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                  Đang xử lý...
+                                </>
+                              ) : (
+                                <>
+                                  <CheckCircle2 className="mr-2 h-4 w-4" />
+                                  Xác nhận đã thanh toán
+                                </>
+                              )}
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                    )) : (
+                      <div className="text-center py-8 text-gray-500">
+                        <DollarSign className="h-12 w-12 mx-auto mb-2 text-gray-400" />
+                        <p>Chưa có hóa đơn nào</p>
+                      </div>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            {/* Room Management Tab */}
+            <TabsContent value="rooms" className="space-y-6">
+              <RoomManagementTab
+                rooms={rooms}
+                roomAssignments={roomAssignments}
+                patients={allPatients}
+                onRefresh={loadDashboardData}
+              />
+            </TabsContent>
           </Tabs>
         </div>
       </div>
+
+      {/* Enhanced Billing Dialog */}
+      <Dialog open={showAddBillingDialog} onOpenChange={setShowAddBillingDialog}>
+        <DialogContent className="sm:max-w-[900px] max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Plus className="h-5 w-5 text-blue-600" />
+              Lập hóa đơn mới
+            </DialogTitle>
+            <DialogDescription>
+              Chọn hồ sơ y tế và các dịch vụ đã thực hiện để tạo hóa đơn
+            </DialogDescription>
+          </DialogHeader>
+          <EnhancedBillingForm 
+            onSuccess={() => {
+              setShowAddBillingDialog(false)
+              // Reload billing records
+              billingApi.getAllBilling({ limit: 50 })
+                .then(response => setBillingRecords(response.data))
+                .catch(err => console.error('Error reloading billing:', err))
+            }}
+          />
+        </DialogContent>
+      </Dialog>
 
       {/* Confirm Appointment Dialog */}
       <Dialog open={showConfirmDialog} onOpenChange={setShowConfirmDialog}>
@@ -916,7 +1200,7 @@ export default function NurseDashboard() {
                 </div>
                 <div className="flex justify-between">
                   <span className="text-sm text-gray-600">Giờ hẹn:</span>
-                  <span className="font-semibold">{selectedAppointment.appointment_time}</span>
+                  <span className="font-semibold">{formatAppointmentTime(selectedAppointment.appointment_time)}</span>
                 </div>
                 {selectedAppointment.purpose && (
                   <div className="pt-2 border-t border-blue-200">

@@ -575,24 +575,23 @@ const validateMedicalRecord = [
     .withMessage('Valid patient ID is required'),
 
   body('doctor_id')
+    .optional()
     .isInt({ min: 1 })
     .withMessage('Valid doctor ID is required'),
 
-  body('visit_date')
-    .isISO8601()
-    .withMessage('Valid visit date is required (YYYY-MM-DD)'),
+  // visit_date removed - schema uses created_at instead
 
   body('diagnosis')
     .notEmpty()
     .withMessage('Diagnosis is required')
-    .isLength({ max: 1000 })
-    .withMessage('Diagnosis must not exceed 1000 characters')
+    .isLength({ max: 10000 })
+    .withMessage('Diagnosis must not exceed 10000 characters')
     .trim(),
 
   body('treatment')
     .optional()
-    .isLength({ max: 2000 })
-    .withMessage('Treatment must not exceed 2000 characters')
+    .isLength({ max: 10000 })
+    .withMessage('Treatment must not exceed 10000 characters')
     .trim(),
 
   body('notes')
@@ -691,9 +690,8 @@ const validateBilling = [
 
   body('payment_method')
     .optional()
-    .isLength({ max: 50 })
-    .withMessage('Payment method must not exceed 50 characters')
-    .trim(),
+    .isIn(['CASH', 'TRANSFER'])
+    .withMessage('Payment method must be either CASH or TRANSFER'),
 
   body('description')
     .optional()
@@ -837,29 +835,30 @@ const validateStaffUpdate = [
 
 // Medicine validation rules
 const validateMedicine = [
-  body('medicine_name')
+  body('name')
     .notEmpty()
     .withMessage('Medicine name is required')
     .isLength({ max: 100 })
     .withMessage('Medicine name must not exceed 100 characters')
     .trim(),
 
-  body('medicine_type')
-    .notEmpty()
-    .withMessage('Medicine type is required')
-    .isLength({ max: 50 })
-    .withMessage('Medicine type must not exceed 50 characters')
-    .trim(),
-
-  body('manufacturer')
+  body('brand')
     .optional()
-    .isLength({ max: 100 })
-    .withMessage('Manufacturer must not exceed 100 characters')
+    .isLength({ max: 50 })
+    .withMessage('Brand must not exceed 50 characters')
     .trim(),
 
-  body('unit_price')
-    .isFloat({ min: 0 })
-    .withMessage('Unit price must be a positive number'),
+  body('type')
+    .optional()
+    .isLength({ max: 20 })
+    .withMessage('Type must not exceed 20 characters')
+    .trim(),
+
+  body('dosage')
+    .optional()
+    .isLength({ max: 50 })
+    .withMessage('Dosage must not exceed 50 characters')
+    .trim(),
 
   body('stock_quantity')
     .optional()
@@ -881,17 +880,11 @@ const validateMedicine = [
         }
       }
       return true;
-    }),
-
-  body('description')
-    .optional()
-    .isLength({ max: 500 })
-    .withMessage('Description must not exceed 500 characters')
-    .trim()
+    })
 ];
 
 const validateMedicineUpdate = [
-  body('medicine_name')
+  body('name')
     .optional()
     .notEmpty()
     .withMessage('Medicine name cannot be empty')
@@ -899,24 +892,23 @@ const validateMedicineUpdate = [
     .withMessage('Medicine name must not exceed 100 characters')
     .trim(),
 
-  body('medicine_type')
+  body('brand')
     .optional()
-    .notEmpty()
-    .withMessage('Medicine type cannot be empty')
     .isLength({ max: 50 })
-    .withMessage('Medicine type must not exceed 50 characters')
+    .withMessage('Brand must not exceed 50 characters')
     .trim(),
 
-  body('manufacturer')
+  body('type')
     .optional()
-    .isLength({ max: 100 })
-    .withMessage('Manufacturer must not exceed 100 characters')
+    .isLength({ max: 20 })
+    .withMessage('Type must not exceed 20 characters')
     .trim(),
 
-  body('unit_price')
+  body('dosage')
     .optional()
-    .isFloat({ min: 0 })
-    .withMessage('Unit price must be a positive number'),
+    .isLength({ max: 50 })
+    .withMessage('Dosage must not exceed 50 characters')
+    .trim(),
 
   body('stock_quantity')
     .optional()
@@ -938,31 +930,13 @@ const validateMedicineUpdate = [
         }
       }
       return true;
-    }),
-
-  body('description')
-    .optional()
-    .isLength({ max: 500 })
-    .withMessage('Description must not exceed 500 characters')
+    })
     .trim()
 ];
 
 // Pharmacy validation rules
 const validatePharmacy = [
-  body('patient_id')
-    .isInt({ min: 1 })
-    .withMessage('Valid patient ID is required'),
-
-  body('medicine_id')
-    .isInt({ min: 1 })
-    .withMessage('Valid medicine ID is required'),
-
-  body('quantity')
-    .isInt({ min: 1 })
-    .withMessage('Quantity must be at least 1'),
-
   body('prescription_id')
-    .optional()
     .isInt({ min: 1 })
     .withMessage('Valid prescription ID is required')
 ];
@@ -1218,53 +1192,60 @@ const validateCleaningServiceUpdate = [
     .trim()
 ];
 
-// Prescription validation rules
+// Prescription validation rules - updated for multiple medicines
 const validatePrescription = [
   body('patient_id')
     .isInt({ min: 1 })
     .withMessage('Valid patient ID is required'),
 
-  body('prescription_date')
-    .optional()
-    .isISO8601()
-    .withMessage('Valid prescription date is required (YYYY-MM-DD)'),
-
   body('diagnosis')
-    .notEmpty()
-    .withMessage('Diagnosis is required')
-    .isLength({ max: 1000 })
-    .withMessage('Diagnosis must not exceed 1000 characters')
+    .optional()
+    .isLength({ max: 500 })
+    .withMessage('Diagnosis must not exceed 500 characters')
     .trim(),
 
-  body('medications')
-    .notEmpty()
-    .withMessage('Medications are required')
-    .isLength({ max: 2000 })
-    .withMessage('Medications must not exceed 2000 characters')
-    .trim(),
-
-  body('dosage_instructions')
+  body('instructions')
     .optional()
     .isLength({ max: 1000 })
-    .withMessage('Dosage instructions must not exceed 1000 characters')
+    .withMessage('Instructions must not exceed 1000 characters')
     .trim(),
 
-  body('duration')
+  body('items')
+    .isArray({ min: 1 })
+    .withMessage('Items must be an array with at least one medicine'),
+
+  body('items.*.medicine_id')
+    .isInt({ min: 1 })
+    .withMessage('Valid medicine ID is required for each item'),
+
+  body('items.*.quantity')
     .optional()
-    .isLength({ max: 100 })
-    .withMessage('Duration must not exceed 100 characters')
+    .isInt({ min: 1 })
+    .withMessage('Quantity must be a positive integer'),
+
+  body('items.*.dosage')
+    .optional()
+    .isLength({ max: 255 })
+    .withMessage('Dosage must not exceed 255 characters')
     .trim(),
 
-  body('notes')
+  body('items.*.frequency')
     .optional()
-    .isLength({ max: 1000 })
-    .withMessage('Notes must not exceed 1000 characters')
+    .isLength({ max: 255 })
+    .withMessage('Frequency must not exceed 255 characters')
     .trim(),
 
-  body('status')
+  body('items.*.duration')
     .optional()
-    .isIn(['ACTIVE', 'COMPLETED', 'CANCELLED', 'EXPIRED'])
-    .withMessage('Invalid prescription status')
+    .isLength({ max: 255 })
+    .withMessage('Duration must not exceed 255 characters')
+    .trim(),
+
+  body('items.*.instructions')
+    .optional()
+    .isLength({ max: 500 })
+    .withMessage('Item instructions must not exceed 500 characters')
+    .trim()
 ];
 
 const validatePrescriptionUpdate = [

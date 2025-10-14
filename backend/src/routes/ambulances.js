@@ -17,7 +17,7 @@ const { authenticateToken, requireStaff, requireAdmin, requireRole } = require('
  *       200:
  *         description: Driver dashboard data retrieved successfully
  */
-router.get('/driver/dashboard', authenticateToken, requireRole(['driver', 'admin']), AmbulanceController.getDriverDashboard);
+router.get('/driver/dashboard', authenticateToken, requireRole('driver', 'admin'), AmbulanceController.getDriverDashboard);
 
 /**
  * @swagger
@@ -38,7 +38,7 @@ router.get('/driver/dashboard', authenticateToken, requireRole(['driver', 'admin
  *       200:
  *         description: Emergency dispatches retrieved successfully
  */
-router.get('/emergency-dispatches', authenticateToken, requireRole(['driver', 'admin']), AmbulanceController.getEmergencyDispatches);
+router.get('/emergency-dispatches', authenticateToken, requireRole('driver', 'admin'), AmbulanceController.getEmergencyDispatches);
 
 /**
  * @swagger
@@ -70,7 +70,7 @@ router.get('/emergency-dispatches', authenticateToken, requireRole(['driver', 'a
  *       200:
  *         description: Dispatch accepted successfully
  */
-router.post('/dispatches/:dispatchId/accept', authenticateToken, requireRole(['driver', 'admin']), AmbulanceController.acceptDispatch);
+router.post('/dispatches/:dispatchId/accept', authenticateToken, requireRole('driver', 'admin'), AmbulanceController.acceptDispatch);
 
 /**
  * @swagger
@@ -109,7 +109,7 @@ router.post('/dispatches/:dispatchId/accept', authenticateToken, requireRole(['d
  *       200:
  *         description: Transport status updated successfully
  */
-router.put('/transports/:transportId/status', authenticateToken, requireRole(['driver', 'admin']), AmbulanceController.updateTransportStatus);
+router.put('/transports/:transportId/status', authenticateToken, requireRole('driver', 'admin'), AmbulanceController.updateTransportStatus);
 
 /**
  * @swagger

@@ -17,7 +17,7 @@ const { authenticateToken, requireStaff, requireDoctor, requireRole } = require(
  *       200:
  *         description: Technician dashboard data retrieved successfully
  */
-router.get('/technician/dashboard', authenticateToken, requireRole(['technician', 'admin']), medicalRecordController.getTechnicianDashboard);
+router.get('/technician/dashboard', authenticateToken, requireRole('technician', 'admin'), medicalRecordController.getTechnicianDashboard);
 
 /**
  * @swagger
@@ -60,7 +60,7 @@ router.get('/technician/dashboard', authenticateToken, requireRole(['technician'
  *       200:
  *         description: Test result recorded successfully
  */
-router.post('/tests/:testId/result', authenticateToken, requireRole(['technician', 'admin']), medicalRecordController.recordTestResult);
+router.post('/tests/:testId/result', authenticateToken, requireRole('technician', 'admin'), medicalRecordController.recordTestResult);
 
 /**
  * @swagger

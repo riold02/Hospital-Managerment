@@ -377,10 +377,22 @@ const getDoctorMedicalRecords = async (req, res) => {
           patient: {
             select: {
               patient_id: true,
+              patient_code: true,
               first_name: true,
               last_name: true,
               date_of_birth: true,
-              gender: true
+              gender: true,
+              phone: true,
+              address: true,
+              allergies: true
+            }
+          },
+          doctor: {
+            select: {
+              doctor_id: true,
+              first_name: true,
+              last_name: true,
+              specialty: true
             }
           }
         },

@@ -5,7 +5,7 @@ const { authenticateToken, requireRole } = require('../middleware/auth');
 
 // Apply authentication and lab assistant role requirement to all routes
 router.use(authenticateToken);
-router.use(requireRole(['lab_assistant', 'technician', 'admin']));
+router.use(requireRole('lab_assistant', 'technician', 'admin'));
 
 /**
  * @swagger

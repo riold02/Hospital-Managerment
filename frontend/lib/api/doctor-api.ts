@@ -255,23 +255,37 @@ export class DoctorApiService {
     const response = await apiClient.post<{
       success: boolean
       data: MedicalRecord
-    }>('/doctor/medical-records', data)
+    }>('/medical-records', data)
     return response.data
   }
 
-  // Create prescription
+  // Create prescription with multiple medicines
   async createPrescription(data: {
     patient_id: number
-    medicine_id: number
-    dosage: string
-    frequency: string
-    duration: string
+    diagnosis: string
     instructions?: string
+    items: Array<{
+      medicine_id: number
+      quantity: number
+      dosage: string
+      frequency: string
+      duration: string
+      instructions?: string
+    }>
   }): Promise<PrescriptionData> {
     const response = await apiClient.post<{
       success: boolean
       data: PrescriptionData
-    }>('/doctor/prescriptions', data)
+    }>('/prescriptions', data)
+    return response.data
+  }
+
+  // Get all medicines for prescription
+  async getMedicines(): Promise<any[]> {
+    const response = await apiClient.get<{
+      success: boolean
+      data: any[]
+    }>('/medicine')
     return response.data
   }
 }

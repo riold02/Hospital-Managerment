@@ -56,21 +56,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     // Check if this is a demo token
     if (token && token.startsWith('demo_')) {
+      console.log("[AUTH] Detected demo token:", token.substring(0, 20) + "...")
       // For demo users, get data from localStorage
       const userInfo = localStorage.getItem("user_info")
       if (userInfo) {
         try {
           const userData = JSON.parse(userInfo) as User
-          console.log("Loading demo user from localStorage:", userData)
+          console.log("[AUTH] Loading demo user from localStorage:", userData)
           setUser(userData)
           setIsDemo(true)
           const primaryRole = (userData.roles?.[0] || userData.role || "patient").toLowerCase()
           localStorage.setItem("user_role", primaryRole)
+          console.log("[AUTH] Demo user role:", primaryRole)
         } catch (error) {
-          console.error("Failed to parse demo user info:", error)
+          console.error("[AUTH] Failed to parse demo user info:", error)
           localStorage.removeItem("auth_token")
           localStorage.removeItem("user_role")
           localStorage.removeItem("user_info")
+          router.push("/")
         }
       } else {
         // No user info stored yet, wait a bit
@@ -93,22 +96,30 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     } else {
       // For real users, call API
+      console.log("[AUTH] Real token detected, calling /auth/me...")
       apiClient
         .get("/auth/me")
         .then((resp: any) => {
           if (resp?.success && resp?.data) {
+            console.log("[AUTH] Successfully loaded real user:", resp.data)
             setUser(resp.data as User)
             const primaryRole = (resp.data.roles?.[0] || resp.data.role || "patient").toLowerCase()
             setIsDemo(false)
             localStorage.setItem("user_role", primaryRole)
             localStorage.setItem("user_info", JSON.stringify(resp.data))
+            console.log("[AUTH] Real user role:", primaryRole)
           }
         })
-        .catch(() => {
+        .catch((error) => {
           // token có thể hết hạn
+          console.error("[AUTH] Failed to fetch user data on mount:", error)
+          console.log("[AUTH] Error details:", error.response?.data || error.message)
+          console.log("[AUTH] Clearing auth data and redirecting to home...")
           localStorage.removeItem("auth_token")
           localStorage.removeItem("user_role")
           localStorage.removeItem("user_info")
+          // Redirect to home if token is invalid
+          router.push("/")
         })
     }
   }, [])

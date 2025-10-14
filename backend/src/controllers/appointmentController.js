@@ -7,16 +7,12 @@ class AppointmentController {
     try {
       const errors = validationResult(req);
       if (!errors.isEmpty()) {
-        console.log('Validation errors:', JSON.stringify(errors.array(), null, 2));
         return res.status(400).json({
           success: false,
           error: 'Validation failed',
           details: errors.array()
         });
       }
-
-      console.log('Raw request body:', req.body);
-      console.log('User from token:', req.user);
       
       // Get patient_id from JWT token for security
       const patient_id = req.user.patient_id || req.user.id;
@@ -28,29 +24,17 @@ class AppointmentController {
         });
       }
       
-      // Chuyển đổi time string (HH:MM) thành DateTime object cho PostgreSQL
+      // Chuyển đổi time string (HH:MM) - Prisma sẽ tự động handle TIME type
       const timeString = req.body.appointment_time; // "17:00"
-      const [hours, minutes] = timeString.split(':');
-      
-      // Tạo DateTime object với ngày hôm nay và time specified
-      const appointmentTime = new Date();
-      appointmentTime.setHours(parseInt(hours), parseInt(minutes), 0, 0);
-      
-      console.log('Time conversion:', { 
-        original: timeString, 
-        converted: appointmentTime.toISOString() 
-      });
       
       const appointmentData = {
         patient_id: Number(patient_id),
         doctor_id: req.body.doctor_id ? Number(req.body.doctor_id) : null,
         appointment_date: new Date(req.body.appointment_date),
-        appointment_time: appointmentTime, // DateTime object cho PostgreSQL Time
+        appointment_time: timeString, // Prisma sẽ tự convert string sang TIME
         purpose: req.body.purpose || null,
         status: req.body.status || 'Scheduled' // Keep PascalCase - database constraint requires it
       };
-      
-      console.log('Processed appointment data:', appointmentData);
 
       // Skip conflict check temporarily due to UTF-8 database issues
       
@@ -213,23 +197,6 @@ class AppointmentController {
   // Update appointment
   async updateAppointment(req, res) {
     try {
-      console.log('[UPDATE APPOINTMENT] ===== START =====');
-      console.log('[UPDATE APPOINTMENT] Request ID:', req.params.id);
-      console.log('[UPDATE APPOINTMENT] Request Body:', JSON.stringify(req.body, null, 2));
-      console.log('[UPDATE APPOINTMENT] User:', req.user);
-      
-      // DISABLED validation check for now to allow status updates
-      // const errors = validationResult(req);
-      // console.log('[UPDATE APPOINTMENT] Validation errors check:', errors.isEmpty());
-      // if (!errors.isEmpty()) {
-      //   console.log('[UPDATE APPOINTMENT] Validation errors:', JSON.stringify(errors.array(), null, 2));
-      //   return res.status(400).json({
-      //     success: false,
-      //     error: 'Validation failed',
-      //     details: errors.array()
-      //   });
-      // }
-
       const { id } = req.params;
       const updateData = {
         patient_id: req.body.patient_id ? Number(req.body.patient_id) : undefined,
@@ -239,10 +206,6 @@ class AppointmentController {
         reason: req.body.purpose || req.body.reason,
         status: req.body.status // Keep original case - database expects PascalCase
       };
-
-      console.log('[UPDATE APPOINTMENT] Request body:', JSON.stringify(req.body, null, 2));
-      console.log('[UPDATE APPOINTMENT] Request body status:', req.body.status);
-      console.log('[UPDATE APPOINTMENT] UpdateData status:', updateData.status);
 
       // Remove undefined values
       Object.keys(updateData).forEach(key => updateData[key] === undefined && delete updateData[key]);
@@ -438,7 +401,7 @@ class AppointmentController {
             }
           }
         },
-        orderBy: { appointment_date: 'desc' }
+        orderBy: { appointment_date: 'asc' } // Sort by nearest date first
       });
 
       res.json({
@@ -477,7 +440,7 @@ class AppointmentController {
             }
           }
         },
-        orderBy: { appointment_date: 'desc' }
+        orderBy: { appointment_date: 'asc' } // Sort by nearest date first
       });
 
       res.json({

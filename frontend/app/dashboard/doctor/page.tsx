@@ -9,7 +9,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card"
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { toast } from "@/hooks/use-toast"
+import { formatAppointmentTime } from "@/lib/utils"
 import {
   Dialog,
   DialogContent,
@@ -57,13 +60,15 @@ import {
   BedDouble,
   Building,
   LogOut,
-  User
+  User,
+  RefreshCcw
 } from "lucide-react"
 import { useAuth } from "@/lib/auth-context"
 import { useUser } from "@/hooks/useUser"
 import { doctorApi, DoctorDashboardData, AppointmentData, DoctorInfo, staffApi, StaffMember } from "@/lib/api"
 import { useRouter } from "next/navigation"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import ShiftScheduleCalendar from "@/components/shared/ShiftScheduleCalendar"
 // Comment out problematic imports
 // import AppointmentsPage from "@/app/appointments/page"
 // import MedicalRecordsPage from "@/app/medical-records/page"
@@ -77,134 +82,6 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 // import DoctorsPage from "@/app/doctors/page"
 // import StaffPage from "@/app/staff/page"
 
-// Mock data for comprehensive doctor dashboard
-const mockKPIData = {
-  appointmentsToday: 12,
-  completedToday: 8,
-  pendingResults: 5,
-  criticalAlerts: 2,
-  inpatients: 6,
-  newMessages: 3,
-}
-
-const mockAppointments = [
-  {
-    id: 1,
-    time: "08:30",
-    patient: "Nguyễn Văn An",
-    age: 45,
-    gender: "Nam",
-    purpose: "Khám tổng quát",
-    status: "Đã đến",
-    patient_id: "P001",
-    avatar: "/api/placeholder/32/32",
-    allergies: ["Penicillin", "Aspirin"],
-    conditions: ["Tăng huyết áp", "Tiểu đường type 2"],
-    lastVisit: "2024-01-15",
-    vitals: { bp: "140/90", hr: "78", temp: "36.5" },
-  },
-  {
-    id: 2,
-    time: "09:15",
-    patient: "Trần Thị Bình",
-    age: 32,
-    gender: "Nữ",
-    purpose: "Tái khám tim mạch",
-    status: "Đang khám",
-    patient_id: "P002",
-    avatar: "/api/placeholder/32/32",
-    allergies: [],
-    conditions: ["Rối loạn nhịp tim"],
-    lastVisit: "2024-01-10",
-    vitals: { bp: "120/80", hr: "85", temp: "36.8" },
-  },
-  {
-    id: 3,
-    time: "10:00",
-    patient: "Lê Minh Cường",
-    age: 28,
-    gender: "Nam",
-    purpose: "Khám da liễu",
-    status: "Trễ hẹn",
-    patient_id: "P003",
-    avatar: "/api/placeholder/32/32",
-    allergies: ["Latex"],
-    conditions: ["Viêm da cơ địa"],
-    lastVisit: "2024-01-08",
-    vitals: { bp: "115/75", hr: "72", temp: "36.4" },
-  },
-  {
-    id: 4,
-    time: "11:30",
-    patient: "Phạm Thị Dung",
-    age: 55,
-    gender: "Nữ",
-    purpose: "Khám nội tiết",
-    status: "Đang chờ",
-    patient_id: "P004",
-    avatar: "/api/placeholder/32/32",
-    allergies: [],
-    conditions: ["Suy giáp"],
-    lastVisit: "2024-01-05",
-    vitals: { bp: "130/85", hr: "68", temp: "36.6" },
-  },
-]
-
-const mockInpatients = [
-  {
-    id: 1,
-    room: "A101",
-    bed: "1",
-    patient: "Hoàng Văn Đức",
-    condition: "Phẫu thuật ruột thừa",
-    priority: "Cao",
-    vitals: { bp: "125/80", hr: "82", temp: "37.2", spo2: "98%" },
-    orders: 3,
-    lastNote: "2 giờ trước",
-  },
-  {
-    id: 2,
-    room: "A102",
-    bed: "2",
-    patient: "Nguyễn Thị Lan",
-    condition: "Viêm phổi",
-    priority: "Trung bình",
-    vitals: { bp: "110/70", hr: "88", temp: "38.1", spo2: "95%" },
-    orders: 1,
-    lastNote: "4 giờ trước",
-  },
-]
-
-const mockPendingResults = [
-  { id: 1, patient: "Nguyễn Văn An", test: "Xét nghiệm máu tổng quát", status: "Hoàn thành", priority: "Bình thường" },
-  { id: 2, patient: "Trần Thị Bình", test: "Siêu âm tim", status: "Hoàn thành", priority: "Cần xem ngay" },
-  { id: 3, patient: "Lê Minh Cường", test: "X-quang ngực", status: "Đang xử lý", priority: "Bình thường" },
-]
-
-const mockMessages = [
-  {
-    id: 1,
-    from: "Y tá Nguyễn Lan",
-    message: "Bệnh nhân phòng A101 cần tư vấn thuốc",
-    time: "10 phút trước",
-    priority: "Cao",
-  },
-  {
-    id: 2,
-    from: "Dược sĩ Trần Minh",
-    message: "Đơn thuốc P002 có tương tác",
-    time: "30 phút trước",
-    priority: "Trung bình",
-  },
-  {
-    id: 3,
-    from: "Kỹ thuật viên",
-    message: "Kết quả CT scan đã sẵn sàng",
-    time: "1 giờ trước",
-    priority: "Bình thường",
-  },
-]
-
 export default function DoctorDashboard() {
   const { user, logout } = useAuth()
   const router = useRouter()
@@ -216,11 +93,16 @@ export default function DoctorDashboard() {
   
   // Real KPI Data States
   const [dashboardData, setDashboardData] = useState<DoctorDashboardData | null>(null)
+  const [allAppointments, setAllAppointments] = useState<AppointmentData[]>([])
   const [appointments, setAppointments] = useState<AppointmentData[]>([])
   const [inpatients, setInpatients] = useState([])
   const [pendingResults, setPendingResults] = useState([])
   const [messages, setMessages] = useState([])
   const [criticalAlerts, setCriticalAlerts] = useState(0)
+  
+  // Appointment Filter States
+  const [daysFilter, setDaysFilter] = useState<number>(7) // -30, -7, 7, 30 days
+  const [statusFilter, setStatusFilter] = useState<string>('all') // all, scheduled, confirmed, cancelled, completed
   const [doctorInfo, setDoctorInfo] = useState<DoctorInfo | null>(null)
   const [allDoctors, setAllDoctors] = useState<DoctorInfo[]>([])
   const [doctorStats, setDoctorStats] = useState<any>(null)
@@ -238,6 +120,10 @@ export default function DoctorDashboard() {
   const [showMedicalHistory, setShowMedicalHistory] = useState(false)
   const [showProgressNotes, setShowProgressNotes] = useState(false)
   const [showExamination, setShowExamination] = useState(false)
+  const [showMedicalRecordDetail, setShowMedicalRecordDetail] = useState(false)
+  const [selectedMedicalRecord, setSelectedMedicalRecord] = useState<any | null>(null)
+  const [showLabResultDialog, setShowLabResultDialog] = useState(false)
+  const [selectedLabResult, setSelectedLabResult] = useState<any | null>(null)
   
   // Clinical Workflow Tab State
   const [clinicalTab, setClinicalTab] = useState("notes")
@@ -262,13 +148,25 @@ export default function DoctorDashboard() {
 
   // Prescription State
   const [prescription, setPrescription] = useState({
-    medication: "",
+    medicine_id: "",
+    medicine_name: "", // For display purposes
+    quantity: "1",
     dosage: "",
     frequency: "",
     duration: "",
     instructions: "",
   })
   const [prescriptions, setPrescriptions] = useState<any[]>([])
+
+  // Medicines State
+  const [medicines, setMedicines] = useState<any[]>([])
+  const [loadingMedicines, setLoadingMedicines] = useState(false)
+  const [medicineSearchOpen, setMedicineSearchOpen] = useState(false)
+  const [medicineSearchValue, setMedicineSearchValue] = useState("")
+
+  // Medical History State
+  const [medicalHistory, setMedicalHistory] = useState<any[]>([])
+  const [loadingHistory, setLoadingHistory] = useState(false)
 
   // Common medications list
   const commonMedications = [
@@ -281,6 +179,85 @@ export default function DoctorDashboard() {
     "Aspirin 100mg",
     "Cetirizine 10mg",
   ]
+
+  // Helper function to check if value is in normal range
+  const isValueInRange = (value: any, range: string) => {
+    if (!value || !range) return true;
+    
+    const numValue = parseFloat(String(value).replace(/[^0-9.-]/g, ''));
+    if (isNaN(numValue)) return true;
+    
+    // Handle range formats: "50-100", "<100", ">50", "50-100 mg/dL", etc.
+    const rangeStr = range.trim();
+    
+    // Handle less than
+    if (rangeStr.startsWith('<') || rangeStr.startsWith('≤')) {
+      const maxValue = parseFloat(rangeStr.replace(/[^0-9.-]/g, ''));
+      return numValue <= maxValue;
+    }
+    
+    // Handle greater than
+    if (rangeStr.startsWith('>') || rangeStr.startsWith('≥')) {
+      const minValue = parseFloat(rangeStr.replace(/[^0-9.-]/g, ''));
+      return numValue >= minValue;
+    }
+    
+    // Handle range
+    const rangeParts = rangeStr.match(/(\d+\.?\d*)\s*-\s*(\d+\.?\d*)/);
+    if (rangeParts && rangeParts.length >= 3) {
+      const minValue = parseFloat(rangeParts[1]);
+      const maxValue = parseFloat(rangeParts[2]);
+      return numValue >= minValue && numValue <= maxValue;
+    }
+    
+    return true; // If we can't parse, assume normal
+  }
+
+  // Handle print lab result
+  const handlePrintLabResult = (result: any) => {
+    toast({
+      title: "In kết quả",
+      description: `Đang chuẩn bị in kết quả xét nghiệm cho ${result.patient?.full_name}...`,
+    });
+    // TODO: Implement actual print functionality
+  }
+
+  // Filter appointments by date range and status
+  const filterAppointments = (appointments: AppointmentData[]) => {
+    const now = new Date();
+    now.setHours(0, 0, 0, 0); // Start of today
+
+    return appointments.filter((apt: AppointmentData) => {
+      const aptDate = new Date(apt.appointment_date);
+      aptDate.setHours(0, 0, 0, 0);
+
+      // Date filter - support both forward and backward
+      if (daysFilter > 0) {
+        // Forward: today to today + daysFilter
+        const maxDate = new Date(now);
+        maxDate.setDate(maxDate.getDate() + daysFilter);
+        if (aptDate < now || aptDate > maxDate) return false;
+      } else if (daysFilter < 0) {
+        // Backward: today - |daysFilter| to today
+        const minDate = new Date(now);
+        minDate.setDate(minDate.getDate() + daysFilter); // daysFilter is negative
+        if (aptDate < minDate || aptDate > now) return false;
+      }
+
+      // Status filter
+      if (statusFilter === 'all') return true;
+      if (statusFilter === 'scheduled') return apt.status === 'Scheduled';
+      if (statusFilter === 'confirmed') return apt.status === 'Confirmed';
+      if (statusFilter === 'cancelled') return apt.status === 'Cancelled';
+      if (statusFilter === 'completed') return apt.status === 'Completed';
+      return true;
+    });
+  };
+
+  // Apply filters when filter options change
+  useEffect(() => {
+    setAppointments(filterAppointments(allAppointments));
+  }, [daysFilter, statusFilter, allAppointments]);
 
   useEffect(() => {
     if (user) {
@@ -331,35 +308,46 @@ export default function DoctorDashboard() {
           .then(response => {
             setDashboardData(response)
           })
-          .catch(err => console.error('Dashboard API error:', err)),
+          .catch(() => {}),
 
         // Load doctor appointments
-        doctorApi.getAppointments({ limit: 20 })
+        doctorApi.getAppointments({ limit: 100 })
           .then(response => {
-            setAppointments(response.data)
+            setAllAppointments(response.data)
+            setAppointments(response.data) // Initial display
           })
-          .catch(err => console.error('Appointments API error:', err)),
+          .catch(() => {}),
 
         // Load doctor patients (inpatients)
         doctorApi.getPatients({ limit: 10 })
           .then(response => {
             setInpatients(response.data)
           })
-          .catch(err => console.error('Patients API error:', err)),
+          .catch(() => {}),
 
         // Load medical records (pending results) - may fail
         doctorApi.getMedicalRecords({ limit: 10 })
           .then(response => {
             setPendingResults(response.data)
           })
-          .catch(err => console.error('Medical Records API error (optional):', err)),
+          .catch(() => {}),
 
         // Load doctor schedule
         doctorApi.getSchedule()
           .then(response => {
             // Successfully loaded schedule
           })
-          .catch(err => console.error('Schedule API error:', err)),
+          .catch(() => {}),
+
+        // Load medicines for prescription
+        doctorApi.getMedicines()
+          .then(response => {
+            console.log('Medicines loaded:', response.length, 'items')
+            setMedicines(response)
+          })
+          .catch((error) => {
+            console.error('Failed to load medicines:', error)
+          }),
 
         // Get all doctors to find current doctor info
         doctorApi.getAllDoctors({ limit: 100 })
@@ -373,35 +361,34 @@ export default function DoctorDashboard() {
               }
             }
           })
-          .catch(err => console.error('All Doctors API error:', err)),
+          .catch(() => {}),
 
         // Load doctor statistics
         doctorApi.getStatistics()
           .then(response => {
             setDoctorStats(response)
           })
-          .catch(err => console.error('Statistics API error:', err)),
+          .catch(() => {}),
 
         // Load staff list
         staffApi.getAllStaff({ limit: 100 })
           .then(response => {
             setStaffList(response.data)
           })
-          .catch(err => console.error('Staff API error:', err)),
+          .catch(() => {}),
 
         // Load staff statistics
         staffApi.getStaffStats()
           .then(response => {
             setStaffStats(response.data)
           })
-          .catch(err => console.error('Staff Stats API error:', err))
+          .catch(() => {})
       ])
 
       // Set critical alerts based on real data
       setCriticalAlerts(0)
 
-    } catch (error) {
-      console.error("Error loading dashboard data:", error)
+    } catch (error: any) {
       toast({
         title: "Lỗi",
         description: "Không thể tải dữ liệu dashboard",
@@ -426,14 +413,17 @@ export default function DoctorDashboard() {
     inpatients: inpatients.length,
     newMessages: messages.filter((msg: any) => !msg.read).length
   }
-  console.log('Messages:', messages)
 
   const handleLogout = async () => {
     try {
       await logout()
       router.push('/auth')
-    } catch (error) {
-      console.error('Logout error:', error)
+    } catch (error: any) {
+      toast({
+        title: "Lỗi",
+        description: "Không thể đăng xuất",
+        variant: "destructive",
+      })
     }
   }
 
@@ -458,53 +448,264 @@ export default function DoctorDashboard() {
     setShowExamination(true)
   }
 
-  // Medical Record Handlers
-  const handleSaveClinicalNotes = async () => {
-    if (!selectedPatient?.patient_id && !selectedPatient?.patient_info?.patient_id) {
+  const handleViewMedicalRecordDetail = (record: any) => {
+    setSelectedMedicalRecord(record)
+    setShowMedicalRecordDetail(true)
+  }
+
+  const handlePrintMedicalRecordDetail = () => {
+    if (!selectedMedicalRecord) {
       toast({
         title: "Lỗi",
-        description: "Không tìm thấy thông tin bệnh nhân",
+        description: "Không tìm thấy thông tin hồ sơ y tế",
         variant: "destructive",
       })
       return
     }
 
-    try {
-      const patientId = selectedPatient.patient_info?.patient_id || selectedPatient.patient_id
-      
-      // Tạo medical record với SOAP notes
-      const diagnosis = `${clinicalNotes.assessment}\n\nTriệu chứng: ${clinicalNotes.subjective}\nKhám lâm sàng: ${clinicalNotes.objective}`
-      const treatment = clinicalNotes.plan
-      
-      await doctorApi.createMedicalRecord({
-        patient_id: patientId,
-        diagnosis: diagnosis,
-        treatment: treatment,
-      })
-
-      toast({
-        title: "Thành công",
-        description: "Đã lưu ghi chú khám bệnh",
-      })
-
-      // Clear notes after save
-      setClinicalNotes({
-        subjective: "",
-        objective: "",
-        assessment: "",
-        plan: "",
-        template: "",
-      })
-    } catch (error) {
-      console.error('Error saving clinical notes:', error)
+    // Create print window
+    const printWindow = window.open('', '_blank')
+    if (!printWindow) {
       toast({
         title: "Lỗi",
-        description: "Không thể lưu ghi chú khám bệnh",
+        description: "Không thể mở cửa sổ in. Vui lòng cho phép popup.",
         variant: "destructive",
       })
+      return
+    }
+
+    const record = selectedMedicalRecord
+    const patientName = record.patient?.first_name && record.patient?.last_name
+      ? `${record.patient.first_name} ${record.patient.last_name}`
+      : 'Bệnh nhân'
+    const patientCode = record.patient?.patient_code || 'N/A'
+    const dateOfBirth = record.patient?.date_of_birth 
+      ? new Date(record.patient.date_of_birth).toLocaleDateString('vi-VN')
+      : 'N/A'
+    const gender = record.patient?.gender === 'male' ? 'Nam' : 
+                   record.patient?.gender === 'female' ? 'Nữ' : 'Chưa xác định'
+    const phone = record.patient?.phone || 'N/A'
+    const address = record.patient?.address || 'N/A'
+    const allergies = record.patient?.allergies || 'Không có'
+    
+    const doctorName = record.doctor?.first_name && record.doctor?.last_name
+      ? `${record.doctor.first_name} ${record.doctor.last_name}`
+      : 'Bác sĩ'
+    const specialty = record.doctor?.specialty || 'N/A'
+    const examDate = new Date(record.created_at).toLocaleDateString('vi-VN', { 
+      weekday: 'long', 
+      year: 'numeric', 
+      month: 'long', 
+      day: 'numeric' 
+    })
+
+    // Build HTML content
+    let htmlContent = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="UTF-8">
+        <title>Hồ sơ khám bệnh - ${patientName}</title>
+        <style>
+          @media print {
+            @page { margin: 2cm; }
+            body { margin: 0; }
+          }
+          body {
+            font-family: 'Times New Roman', Times, serif;
+            line-height: 1.6;
+            color: #000;
+            max-width: 21cm;
+            margin: 0 auto;
+            padding: 20px;
+            background: white;
+          }
+          .header {
+            text-align: center;
+            border-bottom: 3px double #000;
+            padding-bottom: 15px;
+            margin-bottom: 20px;
+          }
+          .hospital-name {
+            font-size: 18px;
+            font-weight: bold;
+            text-transform: uppercase;
+            margin-bottom: 5px;
+          }
+          .title {
+            font-size: 24px;
+            font-weight: bold;
+            text-transform: uppercase;
+            margin: 20px 0;
+            color: #2563eb;
+          }
+          .section {
+            margin: 20px 0;
+            page-break-inside: avoid;
+          }
+          .section-title {
+            font-size: 16px;
+            font-weight: bold;
+            background: #f3f4f6;
+            padding: 8px 12px;
+            margin: 15px 0 10px 0;
+            border-left: 4px solid #2563eb;
+          }
+          .info-grid {
+            display: grid;
+            grid-template-columns: 150px 1fr;
+            gap: 8px;
+            margin: 10px 0;
+          }
+          .info-label {
+            font-weight: bold;
+          }
+          .content {
+            margin: 10px 0;
+            padding-left: 20px;
+            white-space: pre-wrap;
+          }
+          .signature-section {
+            margin-top: 50px;
+            display: flex;
+            justify-content: space-between;
+          }
+          .signature-box {
+            text-align: center;
+            width: 200px;
+          }
+          .alert {
+            background: #fee;
+            border: 2px solid #f00;
+            padding: 10px;
+            margin: 15px 0;
+            border-radius: 5px;
+          }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <div class="hospital-name">Bệnh viện Đa khoa Quốc tế</div>
+          <div>Địa chỉ: 123 Đường ABC, Quận XYZ, TP. Hồ Chí Minh</div>
+          <div>Điện thoại: (028) 1234 5678 | Email: info@hospital.vn</div>
+        </div>
+
+        <div class="title">HỒ SƠ KHÁM BỆNH</div>
+
+        <div class="section">
+          <div class="section-title">THÔNG TIN BỆNH NHÂN</div>
+          <div class="info-grid">
+            <div class="info-label">Họ và tên:</div>
+            <div>${patientName}</div>
+            <div class="info-label">Mã bệnh nhân:</div>
+            <div>${patientCode}</div>
+            <div class="info-label">Ngày sinh:</div>
+            <div>${dateOfBirth}</div>
+            <div class="info-label">Giới tính:</div>
+            <div>${gender}</div>
+            <div class="info-label">Điện thoại:</div>
+            <div>${phone}</div>
+            <div class="info-label">Địa chỉ:</div>
+            <div>${address}</div>
+          </div>
+          ${allergies !== 'Không có' ? `
+            <div class="alert">
+              <strong>⚠️ CẢNH BÁO DỊ ỨNG:</strong> ${allergies}
+            </div>
+          ` : ''}
+        </div>
+
+        <div class="section">
+          <div class="section-title">THÔNG TIN KHÁM BỆNH</div>
+          <div class="info-grid">
+            <div class="info-label">Bác sĩ khám:</div>
+            <div>${doctorName}</div>
+            <div class="info-label">Chuyên khoa:</div>
+            <div>${specialty}</div>
+            <div class="info-label">Ngày khám:</div>
+            <div>${examDate}</div>
+          </div>
+        </div>
+
+        ${record.diagnosis ? `
+        <div class="section">
+          <div class="section-title">CHẨN ĐOÁN VÀ TRIỆU CHỨNG</div>
+          <div class="content">${record.diagnosis}</div>
+        </div>
+        ` : ''}
+
+        ${record.treatment ? `
+        <div class="section">
+          <div class="section-title">ĐIỀU TRỊ VÀ CHỈ ĐỊNH</div>
+          <div class="content">${record.treatment}</div>
+        </div>
+        ` : ''}
+
+        ${record.prescription ? `
+        <div class="section">
+          <div class="section-title">ĐƠN THUỐC</div>
+          <div class="content">${record.prescription}</div>
+        </div>
+        ` : ''}
+
+        <div class="signature-section">
+          <div class="signature-box">
+            <p>${examDate}</p>
+            <p style="margin-top: 10px;"><strong>Bệnh nhân</strong></p>
+            <p style="margin-top: 60px;">(Ký và ghi rõ họ tên)</p>
+          </div>
+          <div class="signature-box">
+            <p>${examDate}</p>
+            <p style="margin-top: 10px;"><strong>Bác sĩ điều trị</strong></p>
+            <p style="margin-top: 60px;">${doctorName}</p>
+          </div>
+        </div>
+
+        <script>
+          window.onload = function() {
+            setTimeout(function() {
+              window.print();
+            }, 500);
+          }
+        </script>
+      </body>
+      </html>
+    `
+
+    printWindow.document.write(htmlContent)
+    printWindow.document.close()
+
+    toast({
+      title: "Đã mở cửa sổ in",
+      description: "Vui lòng kiểm tra và in hồ sơ y tế",
+    })
+  }
+
+  // Load Medical History when patient is selected
+  useEffect(() => {
+    if (selectedPatient?.patient_id) {
+      loadMedicalHistory(selectedPatient.patient_id)
+    }
+  }, [selectedPatient?.patient_id])
+
+  const loadMedicalHistory = async (patientId: number) => {
+    setLoadingHistory(true)
+    try {
+      const response = await doctorApi.getMedicalRecords({ patient_id: patientId })
+      setMedicalHistory(response.data)
+    } catch (error: any) {
+      console.error('Error loading medical history:', error)
+      toast({
+        title: "Lỗi",
+        description: "Không thể tải lịch sử khám bệnh",
+        variant: "destructive",
+      })
+    } finally {
+      setLoadingHistory(false)
     }
   }
 
+  // Medical Record Handlers
   const handleAddOrder = () => {
     if (!newOrder.type || !newOrder.test) {
       toast({
@@ -530,10 +731,19 @@ export default function DoctorDashboard() {
   }
 
   const handleAddPrescription = async () => {
-    if (!prescription.medication || !prescription.dosage || !prescription.frequency) {
+    if (!prescription.medicine_id || !prescription.dosage || !prescription.frequency) {
       toast({
         title: "Lỗi",
-        description: "Vui lòng điền đầy đủ thông tin thuốc (Tên, Liều lượng, Tần suất)",
+        description: "Vui lòng điền đầy đủ thông tin thuốc (Tên thuốc, Liều lượng, Tần suất)",
+        variant: "destructive",
+      })
+      return
+    }
+
+    if (!prescription.quantity || parseInt(prescription.quantity) < 1) {
+      toast({
+        title: "Lỗi",
+        description: "Số lượng phải lớn hơn 0",
         variant: "destructive",
       })
       return
@@ -544,12 +754,14 @@ export default function DoctorDashboard() {
     
     toast({
       title: "Thành công",
-      description: `Đã thêm thuốc ${prescription.medication}`,
+      description: `Đã thêm thuốc ${prescription.medicine_name}`,
     })
 
     // Clear form
     setPrescription({
-      medication: "",
+      medicine_id: "",
+      medicine_name: "",
+      quantity: "1",
       dosage: "",
       frequency: "",
       duration: "",
@@ -604,7 +816,16 @@ export default function DoctorDashboard() {
     }
 
     try {
-      const patientId = selectedPatient.patient_info?.patient_id || selectedPatient.patient_id
+      const patientId = Number(selectedPatient.patient_info?.patient_id || selectedPatient.patient_id)
+      
+      if (!patientId || isNaN(patientId)) {
+        toast({
+          title: "Lỗi",
+          description: "Patient ID không hợp lệ",
+          variant: "destructive",
+        })
+        return
+      }
       
       // Build comprehensive diagnosis with SOAP notes
       let diagnosis = `[CHẨN ĐOÁN]\n${clinicalNotes.assessment}\n\n`
@@ -632,9 +853,10 @@ export default function DoctorDashboard() {
       }
       
       if (prescriptions.length > 0) {
-        treatment += `[ĐỌN THUỐC]\n`
+        treatment += `[ĐƠN THUỐC]\n`
         prescriptions.forEach((med: any, index: number) => {
-          treatment += `${index + 1}. ${med.medication}\n`
+          treatment += `${index + 1}. ${med.medicine_name || med.medication}\n`
+          treatment += `   - Số lượng: ${med.quantity}\n`
           treatment += `   - Liều lượng: ${med.dosage}\n`
           treatment += `   - Tần suất: ${med.frequency}\n`
           if (med.duration) {
@@ -646,16 +868,52 @@ export default function DoctorDashboard() {
         })
       }
       
+      // Save medical record first
       await doctorApi.createMedicalRecord({
         patient_id: patientId,
         diagnosis: diagnosis,
         treatment: treatment,
       })
 
-      toast({
-        title: "Thành công",
-        description: "Đã lưu hồ sơ khám bệnh hoàn chỉnh",
-      })
+      // Save prescription with all medicines in ONE request
+      if (prescriptions.length > 0) {
+        try {
+          // Transform prescriptions to items array format
+          const items = prescriptions.map((med: any) => ({
+            medicine_id: parseInt(med.medicine_id),
+            quantity: parseInt(med.quantity) || 1,
+            dosage: med.dosage,
+            frequency: med.frequency,
+            duration: med.duration || '',
+            instructions: med.instructions || '',
+          }))
+
+          // Create ONE prescription with multiple medicines
+          await doctorApi.createPrescription({
+            patient_id: patientId,
+            diagnosis: clinicalNotes.assessment, // Use assessment as diagnosis
+            instructions: clinicalNotes.plan, // Use plan as general instructions
+            items: items,
+          })
+          
+          toast({
+            title: "Thành công",
+            description: `Đã lưu hồ sơ khám bệnh và đơn thuốc với ${prescriptions.length} loại thuốc`,
+          })
+        } catch (error) {
+          console.error('Failed to save prescription:', error)
+          toast({
+            title: "Cảnh báo",
+            description: `Đã lưu hồ sơ khám bệnh nhưng không lưu được đơn thuốc. Lỗi: ${error}`,
+            variant: "destructive",
+          })
+        }
+      } else {
+        toast({
+          title: "Thành công",
+          description: "Đã lưu hồ sơ khám bệnh hoàn chỉnh",
+        })
+      }
 
       // Clear all forms after successful save
       setClinicalNotes({
@@ -671,11 +929,10 @@ export default function DoctorDashboard() {
       // Reload medical records
       loadDashboardData()
       
-    } catch (error) {
-      console.error('Error saving complete medical record:', error)
+    } catch (error: any) {
       toast({
         title: "Lỗi",
-        description: "Không thể lưu hồ sơ khám bệnh",
+        description: error?.message || "Không thể lưu hồ sơ khám bệnh",
         variant: "destructive",
       })
     }
@@ -1177,6 +1434,12 @@ export default function DoctorDashboard() {
               badge: null,
             },
             {
+              value: "shifts",
+              label: "Lịch ca trực",
+              icon: Clock,
+              badge: null,
+            },
+            {
               value: "inbox",
               label: "Tin nhắn",
               icon: Inbox,
@@ -1266,7 +1529,13 @@ export default function DoctorDashboard() {
                 {activeTab === "timeline" && "Tổng quan"}
                 {activeTab === "chart" && "Hồ sơ bệnh nhân"}
                 {activeTab === "inpatient" && "Nội trú"}
-                {activeTab === "results" && "Kết quả"}
+                {activeTab === "results" && "Kết quả xét nghiệm"}
+                {activeTab === "shifts" && "Lịch ca trực"}
+                {activeTab === "staff" && "Nhân viên"}
+                {activeTab === "doctors" && "Bác sĩ"}
+                {activeTab === "patients" && "Bệnh nhân"}
+                {activeTab === "appointments" && "Lịch hẹn"}
+                {activeTab === "medical-records" && "Hồ sơ y tế"}
                 {activeTab === "inbox" && "Hộp thư"}
               </h2>
               <p className="text-sm text-gray-500">
@@ -1422,62 +1691,67 @@ export default function DoctorDashboard() {
                   <div className="lg:col-span-2">
                     <Card className="shadow-sm">
                       <CardHeader>
-                        <div className="flex items-center justify-between">
-                          <div>
+                        <div className="space-y-4">
+                          <div className="flex items-center justify-between">
                             <CardTitle className="flex items-center gap-2">
                               <Clock className="h-5 w-5 text-green-600" />
-                              Lịch hẹn hôm nay
+                              Lịch hẹn
+                              <Badge variant="secondary" className="ml-2">
+                                {appointments.length} lịch hẹn
+                              </Badge>
                             </CardTitle>
-                            {mounted && currentDateFormatted && (
-                              <p className="text-sm text-muted-foreground mt-1">
-                                {currentDateFormatted}
-                              </p>
-                            )}
                           </div>
-                          <div className="flex items-center gap-2">
-                            <Select value={filterStatus} onValueChange={setFilterStatus}>
-                              <SelectTrigger className="w-32">
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="all">Tất cả</SelectItem>
-                                <SelectItem value="late">Trễ hẹn</SelectItem>
-                                <SelectItem value="arrived">Đã đến</SelectItem>
-                                <SelectItem value="examining">Đang khám</SelectItem>
-                                <SelectItem value="completed">Hoàn thành</SelectItem>
-                              </SelectContent>
-                            </Select>
+                          
+                          {/* Filter Controls */}
+                          <div className="flex items-center gap-4">
+                            <div className="flex items-center gap-2">
+                              <Label className="font-semibold">Thời gian:</Label>
+                              <Select value={daysFilter.toString()} onValueChange={(value) => setDaysFilter(Number(value))}>
+                                <SelectTrigger className="w-[180px]">
+                                  <SelectValue placeholder="Chọn khoảng thời gian" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="-30">30 ngày trước</SelectItem>
+                                  <SelectItem value="-7">7 ngày trước</SelectItem>
+                                  <SelectItem value="7">7 ngày tới</SelectItem>
+                                  <SelectItem value="30">30 ngày tới</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
+                            
+                            <div className="flex items-center gap-2">
+                              <Label className="font-semibold">Trạng thái:</Label>
+                              <Select value={statusFilter} onValueChange={setStatusFilter}>
+                                <SelectTrigger className="w-[200px]">
+                                  <SelectValue placeholder="Chọn trạng thái" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="all">Tất cả</SelectItem>
+                                  <SelectItem value="scheduled">Chưa xác nhận</SelectItem>
+                                  <SelectItem value="confirmed">Đã xác nhận</SelectItem>
+                                  <SelectItem value="cancelled">Đã hủy</SelectItem>
+                                  <SelectItem value="completed">Đã hoàn thành</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
+
+                            <div className="ml-auto text-sm text-muted-foreground">
+                              Hiển thị <span className="font-semibold text-primary">{appointments.length}</span> / <span className="font-semibold">{allAppointments.length}</span> lịch hẹn
+                            </div>
                           </div>
                         </div>
                       </CardHeader>
                       <CardContent>
                         <div className="space-y-4">
                           <div className="space-y-4">
-                            {appointments && appointments.length > 0 && mounted && currentDate ? appointments.filter((appointment: any) => {
-                              const appointmentDate = appointment.appointment_date?.split('T')[0]
-                              // Chỉ hiển thị lịch hẹn đã xác nhận của hôm nay, loại bỏ đã hủy
-                              return appointmentDate === currentDate && 
-                                     (appointment.status === "Confirmed" || appointment.status === "Đã xác nhận") &&
-                                     appointment.status !== "Cancelled" && appointment.status !== "Đã hủy"
-                            }).map((appointment, index) => (
+                            {appointments && appointments.length > 0 ? appointments.map((appointment, index) => (
                               <div
                                 key={appointment.appointment_id || appointment.id}
                                 className="flex items-center gap-4 p-4 rounded-lg border hover:bg-green-50 transition-colors"
                               >
                                 <div className="text-center min-w-16">
                                   <div className="text-lg font-bold text-green-800">
-                                    {appointment.appointment_time 
-                                      ? new Date(appointment.appointment_time).toLocaleTimeString('vi-VN', { 
-                                          hour: '2-digit', 
-                                          minute: '2-digit',
-                                          hour12: false 
-                                        })
-                                      : new Date(appointment.appointment_date).toLocaleTimeString('vi-VN', { 
-                                          hour: '2-digit', 
-                                          minute: '2-digit',
-                                          hour12: false 
-                                        })
-                                    }
+                                    {formatAppointmentTime(appointment.appointment_time)}
                                   </div>
                                   <div className="text-xs text-green-600">
                                     {index === 0 ? "Tiếp theo" : `+${index * 45}m`}
@@ -1567,7 +1841,7 @@ export default function DoctorDashboard() {
                             )) : (
                               <div className="text-center py-8 text-gray-500">
                                 <Clock className="h-12 w-12 mx-auto mb-3 opacity-50" />
-                                <p>Không có lịch hẹn nào hôm nay</p>
+                                <p>Không có lịch hẹn nào khớp với bộ lọc</p>
                               </div>
                             )}
                           </div>
@@ -1808,16 +2082,6 @@ export default function DoctorDashboard() {
                                 />
                               </div>
                             </div>
-                            <div className="flex items-center gap-2">
-                              <Button 
-                                className="bg-green-600 hover:bg-green-700"
-                                onClick={handleSaveClinicalNotes}
-                                disabled={!clinicalNotes.assessment || !clinicalNotes.plan}
-                              >
-                                <Save className="h-4 w-4 mr-2" />
-                                Lưu ghi chú
-                              </Button>
-                            </div>
                           </CardContent>
                         </Card>
                       </TabsContent>
@@ -1931,26 +2195,88 @@ export default function DoctorDashboard() {
                               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                                 <div className="space-y-2 lg:col-span-2">
                                   <Label>Tên thuốc *</Label>
-                                  <div className="flex gap-2">
-                                    <Input
-                                      list="common-meds"
-                                      placeholder="Nhập tên thuốc hoặc chọn từ danh sách..."
-                                      value={prescription.medication}
-                                      onChange={(e) => setPrescription((prev) => ({ ...prev, medication: e.target.value }))}
-                                      className="flex-1"
-                                    />
-                                    <datalist id="common-meds">
-                                      {commonMedications.map((med) => (
-                                        <option key={med} value={med} />
-                                      ))}
-                                    </datalist>
-                                  </div>
+                                  <Popover open={medicineSearchOpen} onOpenChange={setMedicineSearchOpen}>
+                                    <PopoverTrigger asChild>
+                                      <Button
+                                        variant="outline"
+                                        role="combobox"
+                                        aria-expanded={medicineSearchOpen}
+                                        className="w-full justify-between"
+                                      >
+                                        {prescription.medicine_name || "Nhập tên thuốc để tìm kiếm..."}
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="ml-2 h-4 w-4 shrink-0 opacity-50"><path d="m7 15 5 5 5-5"/><path d="m7 9 5-5 5 5"/></svg>
+                                      </Button>
+                                    </PopoverTrigger>
+                                    <PopoverContent className="w-[600px] p-0" align="start">
+                                      <Command>
+                                        <CommandInput 
+                                          placeholder="Tìm kiếm thuốc theo tên, loại, hãng..." 
+                                          value={medicineSearchValue}
+                                          onValueChange={setMedicineSearchValue}
+                                        />
+                                        <CommandList>
+                                          <CommandEmpty>Không tìm thấy thuốc nào.</CommandEmpty>
+                                          <CommandGroup>
+                                            {medicines
+                                              .filter((med) => {
+                                                const searchLower = medicineSearchValue.toLowerCase()
+                                                return (
+                                                  med.name.toLowerCase().includes(searchLower) ||
+                                                  med.brand?.toLowerCase().includes(searchLower) ||
+                                                  med.type?.toLowerCase().includes(searchLower)
+                                                )
+                                              })
+                                              .map((med) => (
+                                                <CommandItem
+                                                  key={med.medicine_id}
+                                                  value={med.medicine_id.toString()}
+                                                  onSelect={() => {
+                                                    setPrescription((prev) => ({
+                                                      ...prev,
+                                                      medicine_id: med.medicine_id.toString(),
+                                                      medicine_name: `${med.name} ${med.dosage} (${med.brand})`,
+                                                      dosage: med.dosage || ''
+                                                    }))
+                                                    setMedicineSearchOpen(false)
+                                                    setMedicineSearchValue("")
+                                                  }}
+                                                  className="cursor-pointer"
+                                                >
+                                                  <div className="flex flex-col gap-1 py-1">
+                                                    <div className="flex items-center justify-between w-full">
+                                                      <span className="font-semibold">{med.name} {med.dosage}</span>
+                                                      <Badge variant={med.stock_quantity > 50 ? "default" : med.stock_quantity > 20 ? "secondary" : "destructive"} className="ml-2">
+                                                        Kho: {med.stock_quantity}
+                                                      </Badge>
+                                                    </div>
+                                                    <div className="text-sm text-muted-foreground">
+                                                      {med.brand} • {med.type}
+                                                    </div>
+                                                  </div>
+                                                </CommandItem>
+                                              ))}
+                                          </CommandGroup>
+                                        </CommandList>
+                                      </Command>
+                                    </PopoverContent>
+                                  </Popover>
+                                </div>
+                                
+                                <div className="space-y-2">
+                                  <Label>Số lượng *</Label>
+                                  <Input
+                                    type="number"
+                                    min="1"
+                                    placeholder="Số lượng"
+                                    value={prescription.quantity}
+                                    onChange={(e) => setPrescription((prev) => ({ ...prev, quantity: e.target.value }))}
+                                  />
                                 </div>
                                 
                                 <div className="space-y-2">
                                   <Label>Liều lượng *</Label>
                                   <Input
-                                    placeholder="Ví dụ: 500mg, 1 viên"
+                                    placeholder="Ví dụ: 1 viên, 2 viên"
                                     value={prescription.dosage}
                                     onChange={(e) => setPrescription((prev) => ({ ...prev, dosage: e.target.value }))}
                                   />
@@ -2012,7 +2338,7 @@ export default function DoctorDashboard() {
                                 <Button 
                                   className="w-full md:w-auto bg-green-600 hover:bg-green-700"
                                   onClick={handleAddPrescription}
-                                  disabled={!prescription.medication || !prescription.dosage || !prescription.frequency}
+                                  disabled={!prescription.medicine_id || !prescription.dosage || !prescription.frequency}
                                 >
                                   <Plus className="h-4 w-4 mr-2" />
                                   Thêm vào đơn thuốc
@@ -2055,9 +2381,13 @@ export default function DoctorDashboard() {
                                             <Badge variant="outline" className="bg-green-50 text-green-700 border-green-300">
                                               #{index + 1}
                                             </Badge>
-                                            <h5 className="font-bold text-lg text-gray-900">{rx.medication}</h5>
+                                            <h5 className="font-bold text-lg text-gray-900">{rx.medicine_name || rx.medication}</h5>
                                           </div>
-                                          <div className="grid grid-cols-2 md:grid-cols-3 gap-2 text-sm">
+                                          <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-sm">
+                                            <div>
+                                              <span className="text-gray-500">Số lượng:</span>
+                                              <span className="ml-1 font-medium text-gray-900">{rx.quantity}</span>
+                                            </div>
                                             <div>
                                               <span className="text-gray-500">Liều lượng:</span>
                                               <span className="ml-1 font-medium text-gray-900">{rx.dosage}</span>
@@ -2099,6 +2429,167 @@ export default function DoctorDashboard() {
                                 <Pill className="h-12 w-12 mx-auto mb-3 opacity-50" />
                                 <p className="font-medium">Chưa có thuốc nào trong đơn</p>
                                 <p className="text-sm mt-1">Thêm thuốc bằng form bên trên</p>
+                              </div>
+                            )}
+                          </CardContent>
+                        </Card>
+                      </TabsContent>
+
+                      {/* Follow-up Tab - Medical History */}
+                      <TabsContent value="followup">
+                        <Card>
+                          <CardHeader>
+                            <CardTitle className="flex items-center gap-2">
+                              <FileText className="h-5 w-5 text-blue-600" />
+                              Lịch sử khám bệnh
+                            </CardTitle>
+                            <CardDescription>
+                              Xem lại các lần khám trước của bệnh nhân
+                            </CardDescription>
+                          </CardHeader>
+                          <CardContent>
+                            {loadingHistory ? (
+                              <div className="text-center py-8">
+                                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+                                <p className="text-muted-foreground">Đang tải lịch sử khám bệnh...</p>
+                              </div>
+                            ) : medicalHistory.length > 0 ? (
+                              <div className="space-y-4">
+                                {medicalHistory.map((record) => {
+                                  // Parse the diagnosis and treatment fields
+                                  const parseSection = (text: string, sectionTitle: string) => {
+                                    const regex = new RegExp(`\\[${sectionTitle}\\]\\n([\\s\\S]*?)(?=\\n\\n\\[|$)`)
+                                    const match = text.match(regex)
+                                    return match ? match[1].trim() : ''
+                                  }
+
+                                  const diagnosis = parseSection(record.diagnosis, 'CHẨN ĐOÁN')
+                                  const subjective = parseSection(record.diagnosis, 'TRIỆU CHỨNG CHỦ QUAN')
+                                  const objective = parseSection(record.diagnosis, 'KHÁM LÂM SÀNG')
+                                  const plan = parseSection(record.treatment, 'KẾ HOẠCH ĐIỀU TRỊ')
+                                  const orders = parseSection(record.treatment, 'CHỈ ĐỊNH CẬN LÂM SÀNG')
+
+                                  return (
+                                    <Card key={record.record_id} className="border-2 hover:shadow-md transition-shadow">
+                                      <CardHeader className="pb-3">
+                                        <div className="flex items-center justify-between">
+                                          <div className="flex items-center gap-2">
+                                            <Calendar className="h-4 w-4 text-blue-600" />
+                                            <span className="font-semibold text-sm">
+                                              {new Date(record.created_at).toLocaleDateString('vi-VN', {
+                                                year: 'numeric',
+                                                month: 'long',
+                                                day: 'numeric',
+                                                hour: '2-digit',
+                                                minute: '2-digit'
+                                              })}
+                                            </span>
+                                          </div>
+                                          <Badge variant="outline">Mã: {record.record_id}</Badge>
+                                        </div>
+                                      </CardHeader>
+                                      <CardContent className="space-y-4">
+                                        {/* SOAP Notes Section */}
+                                        <div className="grid grid-cols-2 gap-4">
+                                          {subjective && (
+                                            <div className="space-y-1">
+                                              <div className="flex items-center gap-1">
+                                                <MessageSquare className="h-4 w-4 text-orange-600" />
+                                                <Label className="text-xs font-semibold text-orange-700">
+                                                  TRIỆU CHỨNG CHỦ QUAN
+                                                </Label>
+                                              </div>
+                                              <div className="p-3 bg-orange-50 rounded-md text-sm whitespace-pre-wrap">
+                                                {subjective}
+                                              </div>
+                                            </div>
+                                          )}
+                                          {objective && (
+                                            <div className="space-y-1">
+                                              <div className="flex items-center gap-1">
+                                                <Stethoscope className="h-4 w-4 text-purple-600" />
+                                                <Label className="text-xs font-semibold text-purple-700">
+                                                  KHÁM LÂM SÀNG
+                                                </Label>
+                                              </div>
+                                              <div className="p-3 bg-purple-50 rounded-md text-sm whitespace-pre-wrap">
+                                                {objective}
+                                              </div>
+                                            </div>
+                                          )}
+                                        </div>
+
+                                        {/* Diagnosis */}
+                                        {diagnosis && (
+                                          <div className="space-y-1">
+                                            <div className="flex items-center gap-1">
+                                              <AlertTriangle className="h-4 w-4 text-red-600" />
+                                              <Label className="text-xs font-semibold text-red-700">
+                                                CHẨN ĐOÁN
+                                              </Label>
+                                            </div>
+                                            <div className="p-3 bg-red-50 rounded-md text-sm font-medium whitespace-pre-wrap">
+                                              {diagnosis}
+                                            </div>
+                                          </div>
+                                        )}
+
+                                        {/* Treatment Plan */}
+                                        {plan && (
+                                          <div className="space-y-1">
+                                            <div className="flex items-center gap-1">
+                                              <Heart className="h-4 w-4 text-green-600" />
+                                              <Label className="text-xs font-semibold text-green-700">
+                                                KẾ HOẠCH ĐIỀU TRỊ
+                                              </Label>
+                                            </div>
+                                            <div className="p-3 bg-green-50 rounded-md text-sm whitespace-pre-wrap">
+                                              {plan}
+                                            </div>
+                                          </div>
+                                        )}
+
+                                        {/* Orders */}
+                                        {orders && (
+                                          <div className="space-y-1">
+                                            <div className="flex items-center gap-1">
+                                              <TestTube className="h-4 w-4 text-blue-600" />
+                                              <Label className="text-xs font-semibold text-blue-700">
+                                                CHỈ ĐỊNH CẬN LÂM SÀNG
+                                              </Label>
+                                            </div>
+                                            <div className="p-3 bg-blue-50 rounded-md text-sm whitespace-pre-wrap">
+                                              {orders}
+                                            </div>
+                                          </div>
+                                        )}
+
+                                        {/* Prescription */}
+                                        {record.prescription && (
+                                          <div className="space-y-1">
+                                            <div className="flex items-center gap-1">
+                                              <Pill className="h-4 w-4 text-indigo-600" />
+                                              <Label className="text-xs font-semibold text-indigo-700">
+                                                ĐỐN THUỐC
+                                              </Label>
+                                            </div>
+                                            <div className="p-3 bg-indigo-50 rounded-md text-sm whitespace-pre-wrap">
+                                              {record.prescription}
+                                            </div>
+                                          </div>
+                                        )}
+                                      </CardContent>
+                                    </Card>
+                                  )
+                                })}
+                              </div>
+                            ) : (
+                              <div className="text-center py-12 text-gray-500">
+                                <FileText className="h-16 w-16 mx-auto mb-4 opacity-30" />
+                                <p className="font-medium text-lg">Chưa có lịch sử khám bệnh</p>
+                                <p className="text-sm mt-1">
+                                  Bệnh nhân này chưa có hồ sơ khám bệnh trước đó
+                                </p>
                               </div>
                             )}
                           </CardContent>
@@ -2240,46 +2731,172 @@ export default function DoctorDashboard() {
               {/* Results Tab */}
               <TabsContent value="results" className="space-y-6">
                 <Card>
-                  <CardHeader>
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
                     <CardTitle className="flex items-center gap-2">
-                      <TestTube className="h-5 w-5 text-green-600" />
-                      Kết quả cận lâm sàng
+                      <TestTube className="h-5 w-5 text-purple-600" />
+                      Kết quả cận lâm sàng ({pendingResults?.length || 0})
                     </CardTitle>
+                    <div className="flex gap-2">
+                      <Button variant="outline" size="sm" onClick={() => loadDashboardData()}>
+                        <RefreshCcw className="h-4 w-4 mr-1" />
+                        Làm mới
+                      </Button>
+                    </div>
                   </CardHeader>
                   <CardContent>
-                    <div className="space-y-4">
+                    <div className="space-y-3">
                       {pendingResults && pendingResults.length > 0 ? pendingResults.map((result) => (
-                        <div key={result.id} className="p-4 rounded-lg border hover:bg-green-50 transition-colors">
-                          <div className="flex items-center justify-between">
-                            <div>
-                              <h4 className="font-semibold">{result.patient?.full_name || 'Không có tên'}</h4>
-                              <p className="text-sm text-muted-foreground">{result.test_type || 'Xét nghiệm'}</p>
-                              <p className="text-xs text-gray-500">
-                                Ngày xét nghiệm: {new Date(result.test_date).toLocaleDateString('vi-VN')}
-                              </p>
+                        <Card 
+                          key={result.id} 
+                          className="border-l-4 hover:shadow-md transition-shadow"
+                          style={{ 
+                            borderLeftColor: result.status === 'abnormal' || result.critical_flag ? '#ef4444' : 
+                                             result.status === 'completed' ? '#10b981' : '#6b7280' 
+                          }}
+                        >
+                          <CardContent className="p-4">
+                            <div className="flex items-start justify-between gap-4">
+                              <div className="flex-1">
+                                <div className="flex items-center gap-2 mb-2">
+                                  <h4 className="font-semibold text-base">{result.patient?.full_name || 'Không có tên'}</h4>
+                                  {result.critical_flag && (
+                                    <Badge variant="destructive" className="text-xs">
+                                      <AlertTriangle className="h-3 w-3 mr-1" />
+                                      Khẩn cấp
+                                    </Badge>
+                                  )}
+                                </div>
+                                
+                                <div className="flex items-center gap-4 mb-2">
+                                  <p className="text-sm font-medium text-muted-foreground">
+                                    {result.test_type || 'Xét nghiệm'}
+                                  </p>
+                                  {result.test_code && (
+                                    <span className="text-xs text-gray-500">
+                                      Mã: {result.test_code}
+                                    </span>
+                                  )}
+                                </div>
+                                
+                                <div className="flex items-center gap-4 text-xs text-gray-500 mb-3">
+                                  <span className="flex items-center gap-1">
+                                    <Calendar className="h-3 w-3" />
+                                    Ngày XN: {new Date(result.test_date).toLocaleDateString('vi-VN')}
+                                  </span>
+                                  {result.technician_name && (
+                                    <span>Kỹ thuật viên: {result.technician_name}</span>
+                                  )}
+                                  {result.room_number && (
+                                    <span>Phòng: {result.room_number}</span>
+                                  )}
+                                </div>
+
+                                {/* Test Results Details */}
+                                {result.test_results && result.test_results.length > 0 && (
+                                  <div className="mt-3 space-y-2">
+                                    <p className="text-sm font-semibold text-gray-700">Chi tiết kết quả:</p>
+                                    <div className="space-y-1.5">
+                                      {result.test_results.map((item: any, idx: number) => {
+                                        const isAbnormal = item.is_abnormal || 
+                                          (item.value && item.normal_range && 
+                                           !isValueInRange(item.value, item.normal_range));
+                                        
+                                        return (
+                                          <div 
+                                            key={idx} 
+                                            className={`flex items-center justify-between p-2 rounded ${
+                                              isAbnormal ? 'bg-red-50' : 'bg-gray-50'
+                                            }`}
+                                          >
+                                            <span className="text-sm font-medium">{item.parameter_name || item.parameter}</span>
+                                            <div className="flex items-center gap-3">
+                                              <span className={`font-semibold ${
+                                                isAbnormal ? 'text-red-600' : 'text-green-600'
+                                              }`}>
+                                                {item.value} {item.unit || ''}
+                                              </span>
+                                              {item.normal_range && (
+                                                <span className="text-xs text-gray-500">
+                                                  (BT: {item.normal_range})
+                                                </span>
+                                              )}
+                                              {isAbnormal && (
+                                                <Badge variant="destructive" className="text-xs py-0">
+                                                  <AlertTriangle className="h-3 w-3 mr-1" />
+                                                  Bất thường
+                                                </Badge>
+                                              )}
+                                            </div>
+                                          </div>
+                                        );
+                                      })}
+                                    </div>
+                                  </div>
+                                )}
+
+                                {/* Notes */}
+                                {result.notes && (
+                                  <div className="mt-3 p-2 bg-blue-50 rounded-md border border-blue-100">
+                                    <p className="text-sm">
+                                      <strong className="text-blue-900">Ghi chú:</strong>
+                                      <span className="text-blue-800 ml-2">{result.notes}</span>
+                                    </p>
+                                  </div>
+                                )}
+
+                                {/* Interpretation */}
+                                {result.interpretation && (
+                                  <div className="mt-3 p-2 bg-amber-50 rounded-md border border-amber-100">
+                                    <p className="text-sm">
+                                      <strong className="text-amber-900">Nhận xét:</strong>
+                                      <span className="text-amber-800 ml-2">{result.interpretation}</span>
+                                    </p>
+                                  </div>
+                                )}
+                              </div>
+                              
+                              {/* Status and Actions */}
+                              <div className="flex flex-col gap-2 min-w-[140px]">
+                                <Badge className={
+                                  result.status === 'completed' ? 'bg-green-100 text-green-800 border-green-200' :
+                                  result.status === 'pending' ? 'bg-yellow-100 text-yellow-800 border-yellow-200' :
+                                  result.status === 'in_progress' ? 'bg-blue-100 text-blue-800 border-blue-200' :
+                                  'bg-gray-100 text-gray-800 border-gray-200'
+                                }>
+                                  {result.status === 'completed' ? 'Hoàn thành' :
+                                   result.status === 'pending' ? 'Chờ kết quả' : 
+                                   result.status === 'in_progress' ? 'Đang xử lý' : 'Mới'}
+                                </Badge>
+                                
+                                {result.status === 'completed' && (
+                                  <>
+                                    <Button 
+                                      size="sm" 
+                                      variant="outline" 
+                                      className="w-full justify-start"
+                                      onClick={() => {
+                                        setSelectedLabResult(result);
+                                        setShowLabResultDialog(true);
+                                      }}
+                                    >
+                                      <Eye className="h-3 w-3 mr-1" />
+                                      Chi tiết
+                                    </Button>
+                                    <Button 
+                                      size="sm" 
+                                      variant="outline"
+                                      className="w-full justify-start"
+                                      onClick={() => handlePrintLabResult(result)}
+                                    >
+                                      <Printer className="h-3 w-3 mr-1" />
+                                      In kết quả
+                                    </Button>
+                                  </>
+                                )}
+                              </div>
                             </div>
-                            <div className="flex items-center gap-3">
-                              <Badge
-                                className={
-                                  result.status === "completed"
-                                    ? "bg-green-100 text-green-800"
-                                    : result.status === "pending"
-                                    ? "bg-yellow-100 text-yellow-800"
-                                    : "bg-blue-100 text-blue-800"
-                                }
-                              >
-                                {result.status === "completed" ? "Hoàn thành" : 
-                                 result.status === "pending" ? "Chờ kết quả" : "Đang xử lý"}
-                              </Badge>
-                              {result.status === "completed" && (
-                                <Button size="sm" className="bg-green-600 hover:bg-green-700">
-                                  <Eye className="h-3 w-3 mr-1" />
-                                  Xem kết quả
-                                </Button>
-                              )}
-                            </div>
-                          </div>
-                        </div>
+                          </CardContent>
+                        </Card>
                       )) : (
                         <div className="text-center py-12 text-gray-500">
                           <TestTube className="h-16 w-16 mx-auto mb-4 opacity-30" />
@@ -2541,6 +3158,11 @@ export default function DoctorDashboard() {
                 </Card>
               </TabsContent>
 
+              {/* Shifts Tab - Lịch ca trực */}
+              <TabsContent value="shifts" className="space-y-6">
+                <ShiftScheduleCalendar role="doctor" onRefresh={loadDashboardData} />
+              </TabsContent>
+
               <TabsContent value="appointments" className="space-y-6">
                 <Card>
                   <CardHeader>
@@ -2568,18 +3190,7 @@ export default function DoctorDashboard() {
                             <div className="flex items-center gap-4">
                               <div className="text-center min-w-16">
                                 <div className="text-lg font-bold text-blue-800">
-                                  {appointment.appointment_time 
-                                    ? new Date(appointment.appointment_time).toLocaleTimeString('vi-VN', { 
-                                        hour: '2-digit', 
-                                        minute: '2-digit',
-                                        hour12: false 
-                                      })
-                                    : new Date(appointment.appointment_date).toLocaleTimeString('vi-VN', { 
-                                        hour: '2-digit', 
-                                        minute: '2-digit',
-                                        hour12: false 
-                                      })
-                                  }
+                                  {formatAppointmentTime(appointment.appointment_time)}
                                 </div>
                                 <div className="text-xs text-blue-600">
                                   {new Date(appointment.appointment_date).toLocaleDateString('vi-VN')}
@@ -2646,7 +3257,11 @@ export default function DoctorDashboard() {
                               <Badge variant="secondary">
                                 Hồ sơ y tế
                               </Badge>
-                              <Button size="sm" className="bg-green-600 hover:bg-green-700">
+                              <Button 
+                                size="sm" 
+                                className="bg-green-600 hover:bg-green-700"
+                                onClick={() => handleViewMedicalRecordDetail(record)}
+                              >
                                 <Eye className="h-3 w-3 mr-1" />
                                 Xem chi tiết
                               </Button>
@@ -3292,6 +3907,100 @@ export default function DoctorDashboard() {
             >
               <CheckCircle className="h-4 w-4 mr-2" />
               Hoàn thành khám
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Medical Record Detail Dialog */}
+      <Dialog open={showMedicalRecordDetail} onOpenChange={setShowMedicalRecordDetail}>
+        <DialogContent className="max-w-4xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <FileText className="h-5 w-5 text-green-600" />
+              Chi tiết hồ sơ y tế
+            </DialogTitle>
+            <DialogDescription>
+              Thông tin chi tiết về hồ sơ bệnh án
+            </DialogDescription>
+          </DialogHeader>
+          {selectedMedicalRecord && (
+            <div className="space-y-6">
+              {/* Patient Info */}
+              <div className="p-4 bg-green-50 rounded-lg border border-green-200">
+                <h4 className="font-semibold text-lg mb-2">
+                  Thông tin bệnh nhân
+                </h4>
+                <div className="grid grid-cols-2 gap-4 text-sm">
+                  <div>
+                    <span className="text-gray-600">Tên bệnh nhân:</span>
+                    <p className="font-medium">
+                      {selectedMedicalRecord.patient?.first_name} {selectedMedicalRecord.patient?.last_name}
+                    </p>
+                  </div>
+                  <div>
+                    <span className="text-gray-600">Mã bệnh nhân:</span>
+                    <p className="font-medium">{selectedMedicalRecord.patient?.patient_code || 'N/A'}</p>
+                  </div>
+                  <div>
+                    <span className="text-gray-600">Ngày khám:</span>
+                    <p className="font-medium">
+                      {new Date(selectedMedicalRecord.created_at).toLocaleString('vi-VN')}
+                    </p>
+                  </div>
+                  <div>
+                    <span className="text-gray-600">Bác sĩ điều trị:</span>
+                    <p className="font-medium">
+                      {selectedMedicalRecord.doctor?.first_name} {selectedMedicalRecord.doctor?.last_name}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Diagnosis */}
+              {selectedMedicalRecord.diagnosis && (
+                <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
+                  <h4 className="font-semibold mb-2 flex items-center gap-2">
+                    <Stethoscope className="h-4 w-4 text-blue-600" />
+                    Chẩn đoán và triệu chứng
+                  </h4>
+                  <div className="text-sm whitespace-pre-wrap">{selectedMedicalRecord.diagnosis}</div>
+                </div>
+              )}
+
+              {/* Treatment */}
+              {selectedMedicalRecord.treatment && (
+                <div className="p-4 bg-purple-50 rounded-lg border border-purple-200">
+                  <h4 className="font-semibold mb-2 flex items-center gap-2">
+                    <Activity className="h-4 w-4 text-purple-600" />
+                    Điều trị và chỉ định
+                  </h4>
+                  <div className="text-sm whitespace-pre-wrap">{selectedMedicalRecord.treatment}</div>
+                </div>
+              )}
+
+              {/* Prescription */}
+              {selectedMedicalRecord.prescription && (
+                <div className="p-4 bg-orange-50 rounded-lg border border-orange-200">
+                  <h4 className="font-semibold mb-2 flex items-center gap-2">
+                    <Pill className="h-4 w-4 text-orange-600" />
+                    Đơn thuốc
+                  </h4>
+                  <div className="text-sm whitespace-pre-wrap">{selectedMedicalRecord.prescription}</div>
+                </div>
+              )}
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowMedicalRecordDetail(false)}>
+              Đóng
+            </Button>
+            <Button 
+              className="bg-green-600 hover:bg-green-700"
+              onClick={handlePrintMedicalRecordDetail}
+            >
+              <Printer className="h-4 w-4 mr-2" />
+              In hồ sơ
             </Button>
           </DialogFooter>
         </DialogContent>

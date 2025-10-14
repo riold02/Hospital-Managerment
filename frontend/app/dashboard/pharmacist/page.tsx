@@ -2,12 +2,37 @@
 
 import { useState, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+
+// Helper function to map status from English to Vietnamese
+const getStatusInVietnamese = (status: string): string => {
+  const statusMap: Record<string, string> = {
+    'Active': 'Chờ cấp phát',
+    'Filled': 'Đã cấp phát',
+    'Partially_Filled': 'Cấp phát một phần',
+    'Cancelled': 'Đã hủy',
+    'Expired': 'Hết hạn'
+  }
+  return statusMap[status] || status
+}
+
+// Helper function to get status badge color
+const getStatusBadgeVariant = (status: string): "default" | "secondary" | "destructive" | "outline" => {
+  switch (status) {
+    case 'Active': return "default" // Blue
+    case 'Filled': return "secondary" // Green
+    case 'Cancelled': return "destructive" // Red
+    case 'Expired': return "outline" // Gray
+    default: return "outline"
+  }
+}
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { toast } from "@/hooks/use-toast"
 import {
   Pill,
@@ -32,7 +57,7 @@ import {
   Plus
 } from "lucide-react"
 import { useAuth } from "@/lib/auth-context"
-import { pharmacyApi, PharmacyDashboardData, Medicine, PharmacyRecord, PendingPrescription } from "@/lib/api"
+import { pharmacyApi, medicineApi, PharmacyDashboardData, Medicine, PharmacyRecord, PendingPrescription } from "@/lib/api"
 import { useRouter } from "next/navigation"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 
@@ -41,9 +66,11 @@ export default function PharmacyDashboard() {
   const router = useRouter()
   const [activeTab, setActiveTab] = useState("overview")
   const [loading, setLoading] = useState(false)
+  const [mounted, setMounted] = useState(false)
   
   // Dashboard Data States
   const [dashboardData, setDashboardData] = useState<PharmacyDashboardData | null>(null)
+  const [allPrescriptions, setAllPrescriptions] = useState<PendingPrescription[]>([])
   const [pendingPrescriptions, setPendingPrescriptions] = useState<PendingPrescription[]>([])
   const [medicineInventory, setMedicineInventory] = useState<Medicine[]>([])
   const [pharmacyRecords, setPharmacyRecords] = useState<PharmacyRecord[]>([])
@@ -52,6 +79,8 @@ export default function PharmacyDashboard() {
   // Search and Filter States
   const [searchTerm, setSearchTerm] = useState("")
   const [categoryFilter, setCategoryFilter] = useState("")
+  const [daysFilter, setDaysFilter] = useState<number>(0) // 0 = Tất cả thời gian
+  const [statusFilter, setStatusFilter] = useState<string>('all') // pending, dispensed, all - mặc định show all
   
   // Dispense Form State
   const [dispenseForm, setDispenseForm] = useState({
@@ -61,6 +90,21 @@ export default function PharmacyDashboard() {
     notes: ""
   })
 
+  // Add Medicine Dialog State
+  const [addMedicineOpen, setAddMedicineOpen] = useState(false)
+  const [addMedicineForm, setAddMedicineForm] = useState({
+    name: "",
+    brand: "",
+    type: "",
+    dosage: "",
+    stock_quantity: "",
+    expiry_date: ""
+  })
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
+
   useEffect(() => {
     if (user) {
       loadDashboardData()
@@ -69,35 +113,28 @@ export default function PharmacyDashboard() {
 
   const loadDashboardData = async () => {
     setLoading(true)
-    console.log('Loading pharmacy dashboard data for user:', user)
     
     try {
       // Load pharmacy dashboard data
       const dashboardResponse = await pharmacyApi.getDashboard()
-      console.log('Pharmacy Dashboard API Response:', dashboardResponse)
       setDashboardData(dashboardResponse)
 
-      // Load pending prescriptions
-      const pendingResponse = await pharmacyApi.getPendingPrescriptions({ limit: 20 })
-      console.log('Pending Prescriptions API Response:', pendingResponse)
-      setPendingPrescriptions(pendingResponse.data)
+      // Load ALL prescriptions (both Active and Filled) for filtering
+      const allPrescriptionsResponse = await pharmacyApi.getPendingPrescriptions({ limit: 100, status: 'all' })
+      setAllPrescriptions(allPrescriptionsResponse.data)
+      setPendingPrescriptions(allPrescriptionsResponse.data) // Initial display
 
       // Load medicine inventory
       const inventoryResponse = await pharmacyApi.getMedicineInventory({ limit: 50 })
-      console.log('Medicine Inventory API Response:', inventoryResponse)
       setMedicineInventory(inventoryResponse.data)
 
       // Load pharmacy records
       const recordsResponse = await pharmacyApi.getPharmacyRecords({ limit: 20 })
-      console.log('Pharmacy Records API Response:', recordsResponse)
       setPharmacyRecords(recordsResponse.data)
 
       // Load expiring medicines
       const expiringResponse = await pharmacyApi.getExpiringMedicines({ days: 30, limit: 10 })
-      console.log('Expiring Medicines API Response:', expiringResponse)
       setExpiringMedicines(expiringResponse.data)
-
-      console.log('Pharmacy dashboard data loaded successfully')
 
     } catch (error) {
       console.error("Error loading pharmacy dashboard data:", error)
@@ -156,6 +193,106 @@ export default function PharmacyDashboard() {
     }
   }
 
+  const handleDispensePrescription = async (prescription: PendingPrescription) => {
+    try {
+      // Check if all items have sufficient stock
+      const insufficientStockItems = prescription.items.filter(
+        item => item.medicine.stock_quantity < item.quantity
+      )
+
+      if (insufficientStockItems.length > 0) {
+        const itemNames = insufficientStockItems.map(item => item.medicine.name).join(', ')
+        toast({
+          title: "Lỗi",
+          description: `Không đủ tồn kho cho: ${itemNames}`,
+          variant: "destructive",
+        })
+        return
+      }
+
+      // Dispense all items in the prescription
+      await pharmacyApi.dispenseMedicine({
+        prescription_id: prescription.prescription_id
+      })
+      
+      const itemCount = prescription.items.length
+      toast({
+        title: "Thành công",
+        description: `Đã cấp phát ${itemCount} thuốc cho ${prescription.patient.first_name} ${prescription.patient.last_name}`,
+      })
+      
+      loadDashboardData()
+
+    } catch (error: any) {
+      console.error("Error dispensing prescription:", error)
+      toast({
+        title: "Lỗi",
+        description: error?.response?.data?.error || "Không thể cấp phát thuốc theo đơn",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const handleAddMedicine = async () => {
+    try {
+      if (!addMedicineForm.name) {
+        toast({
+          title: "Lỗi",
+          description: "Vui lòng nhập tên thuốc",
+          variant: "destructive",
+        })
+        return
+      }
+
+      const medicineData = {
+        name: addMedicineForm.name,
+        brand: addMedicineForm.brand || undefined,
+        type: addMedicineForm.type || undefined,
+        dosage: addMedicineForm.dosage || undefined,
+        stock_quantity: addMedicineForm.stock_quantity ? parseInt(addMedicineForm.stock_quantity) : 0,
+        expiry_date: addMedicineForm.expiry_date || undefined
+      }
+
+      await medicineApi.createMedicine(medicineData)
+      
+      toast({
+        title: "Thành công",
+        description: `Đã thêm thuốc ${addMedicineForm.name} vào kho`,
+      })
+
+      // Reset form and close dialog
+      setAddMedicineForm({
+        name: "",
+        brand: "",
+        type: "",
+        dosage: "",
+        stock_quantity: "",
+        expiry_date: ""
+      })
+      setAddMedicineOpen(false)
+      
+      // Reload data
+      loadDashboardData()
+
+    } catch (error: any) {
+      console.error("Error adding medicine:", error)
+      toast({
+        title: "Lỗi",
+        description: error?.response?.data?.error || "Không thể thêm thuốc",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const handleFillFormFromPrescription = (prescription: PendingPrescription) => {
+    // For now, this function is deprecated since we dispense entire prescriptions at once
+    // Could be used in future for partial dispensing
+    toast({
+      title: "Thông báo",
+      description: "Vui lòng sử dụng nút 'Cấp phát' để cấp phát toàn bộ đơn thuốc",
+    })
+  }
+
   const handleUpdateStock = async (medicineId: number, newStock: number) => {
     try {
       await pharmacyApi.updateMedicineStock(medicineId, { stock_quantity: newStock })
@@ -186,6 +323,44 @@ export default function PharmacyDashboard() {
     }
   }
 
+  // Filter prescriptions by date range and status
+  const filterPrescriptions = (prescriptions: PendingPrescription[]) => {
+    const now = new Date();
+    now.setHours(0, 0, 0, 0);
+
+    return prescriptions.filter((prescription: PendingPrescription) => {
+      // Date filter
+      if (daysFilter !== 0) { // Only filter by date if not "Tất cả thời gian"
+        const prescriptionDate = new Date(prescription.prescription_date);
+        prescriptionDate.setHours(0, 0, 0, 0);
+
+        if (daysFilter > 0) {
+          // Forward: today to today + daysFilter
+          const maxDate = new Date(now);
+          maxDate.setDate(maxDate.getDate() + daysFilter);
+          if (prescriptionDate < now || prescriptionDate > maxDate) return false;
+        } else if (daysFilter < 0) {
+          // Backward: today - |daysFilter| to today
+          const minDate = new Date(now);
+          minDate.setDate(minDate.getDate() + daysFilter);
+          if (prescriptionDate < minDate || prescriptionDate > now) return false;
+        }
+      }
+
+      // Status filter
+      if (statusFilter === 'all') return true;
+      if (statusFilter === 'pending') return prescription.status === 'Active'; // Active means pending to dispense
+      if (statusFilter === 'dispensed') return prescription.status === 'Filled'; // Filled means already dispensed
+      return true;
+    });
+  };
+
+  // Apply filters when filter options change
+  useEffect(() => {
+    const filtered = filterPrescriptions(allPrescriptions);
+    setPendingPrescriptions(filtered);
+  }, [daysFilter, statusFilter, allPrescriptions]);
+
   const filteredMedicines = medicineInventory.filter(medicine =>
     medicine.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     medicine.brand.toLowerCase().includes(searchTerm.toLowerCase())
@@ -215,7 +390,7 @@ export default function PharmacyDashboard() {
             <div>
               <h1 className="text-lg font-bold text-gray-900">Dashboard Dược sĩ</h1>
               <p className="text-sm text-gray-500">
-                {user?.full_name || user?.email || "Dược sĩ"}
+                {mounted ? (user?.full_name || user?.email || "Dược sĩ") : "Đang tải..."}
               </p>
             </div>
           </div>
@@ -278,10 +453,10 @@ export default function PharmacyDashboard() {
               </Avatar>
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium text-gray-900 truncate">
-                  {user?.full_name || user?.email || "Dược sĩ"}
+                  {mounted ? (user?.full_name || user?.email || "Dược sĩ") : "Đang tải..."}
                 </p>
                 <p className="text-xs text-gray-500 truncate">
-                  {user?.email || "pharmacist@hospital.vn"}
+                  {mounted ? (user?.email || "pharmacist@hospital.vn") : "..."}
                 </p>
                 <Badge variant="secondary" className="text-xs mt-1">
                   PHARMACIST
@@ -316,10 +491,12 @@ export default function PharmacyDashboard() {
                 {activeTab === "records" && "Lịch sử cấp phát"}
                 {activeTab === "expiring" && "Thuốc sắp hết hạn"}
               </h2>
-              <p className="text-sm text-gray-500">
-                Chào buổi {new Date().getHours() < 12 ? "sáng" : new Date().getHours() < 18 ? "chiều" : "tối"}, {" "}
-                {user?.full_name || user?.email || "Dược sĩ"}
-              </p>
+              {mounted && (
+                <p className="text-sm text-gray-500">
+                  Chào buổi {new Date().getHours() < 12 ? "sáng" : new Date().getHours() < 18 ? "chiều" : "tối"}, {" "}
+                  {user?.full_name || user?.email || "Dược sĩ"}
+                </p>
+              )}
             </div>
           </div>
         </div>
@@ -337,7 +514,7 @@ export default function PharmacyDashboard() {
                       <div>
                         <Package className="h-8 w-8 text-blue-600 mb-2" />
                         <p className="text-3xl font-bold text-blue-800">
-                          {dashboardData?.totalMedicines || 0}
+                          {dashboardData?.overview?.totalMedicines || 0}
                         </p>
                         <p className="text-sm font-medium text-blue-600">Tổng thuốc</p>
                       </div>
@@ -351,7 +528,7 @@ export default function PharmacyDashboard() {
                       <div>
                         <FileText className="h-8 w-8 text-green-600 mb-2" />
                         <p className="text-3xl font-bold text-green-800">
-                          {dashboardData?.totalPharmacyRecords || 0}
+                          {dashboardData?.overview?.todayDispensed || 0}
                         </p>
                         <p className="text-sm font-medium text-green-600">Lượt cấp phát</p>
                       </div>
@@ -365,7 +542,7 @@ export default function PharmacyDashboard() {
                       <div>
                         <AlertTriangle className="h-8 w-8 text-yellow-600 mb-2" />
                         <p className="text-3xl font-bold text-yellow-800">
-                          {dashboardData?.lowStockCount || 0}
+                          {dashboardData?.overview?.lowStockMedicines || 0}
                         </p>
                         <p className="text-sm font-medium text-yellow-600">Sắp hết</p>
                       </div>
@@ -379,7 +556,7 @@ export default function PharmacyDashboard() {
                       <div>
                         <Clock className="h-8 w-8 text-purple-600 mb-2" />
                         <p className="text-3xl font-bold text-purple-800">
-                          {dashboardData?.pendingPrescriptions || 0}
+                          {dashboardData?.overview?.pendingPrescriptions || 0}
                         </p>
                         <p className="text-sm font-medium text-purple-600">Đơn chờ</p>
                       </div>
@@ -435,39 +612,125 @@ export default function PharmacyDashboard() {
             <TabsContent value="pending" className="space-y-6">
               <Card>
                 <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Clock className="h-5 w-5 text-purple-600" />
-                    Đơn thuốc chờ xử lý ({pendingPrescriptions.length})
-                  </CardTitle>
+                  <div className="space-y-4">
+                    <CardTitle className="flex items-center gap-2">
+                      <Clock className="h-5 w-5 text-purple-600" />
+                      Đơn thuốc
+                      <Badge variant="secondary" className="ml-2">
+                        {pendingPrescriptions.length} đơn
+                      </Badge>
+                    </CardTitle>
+                    
+                    {/* Filter Controls */}
+                    <div className="flex items-center gap-4">
+                      <div className="flex items-center gap-2">
+                        <Label className="font-semibold">Thời gian:</Label>
+                        <Select value={daysFilter.toString()} onValueChange={(value) => setDaysFilter(Number(value))}>
+                          <SelectTrigger className="w-[200px]">
+                            <SelectValue placeholder="Chọn khoảng thời gian" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="0">Tất cả thời gian</SelectItem>
+                            <SelectItem value="-30">30 ngày trước</SelectItem>
+                            <SelectItem value="-7">7 ngày trước</SelectItem>
+                            <SelectItem value="7">7 ngày tới</SelectItem>
+                            <SelectItem value="30">30 ngày tới</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      
+                      <div className="flex items-center gap-2">
+                        <Label className="font-semibold">Trạng thái:</Label>
+                        <Select value={statusFilter} onValueChange={setStatusFilter}>
+                          <SelectTrigger className="w-[180px]">
+                            <SelectValue placeholder="Chọn trạng thái" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="all">Tất cả</SelectItem>
+                            <SelectItem value="pending">Chờ xử lý</SelectItem>
+                            <SelectItem value="dispensed">Đã cấp</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      <div className="ml-auto text-sm text-muted-foreground">
+                        Hiển thị <span className="font-semibold text-primary">{pendingPrescriptions.length}</span> / <span className="font-semibold">{allPrescriptions.length}</span> đơn thuốc
+                      </div>
+                    </div>
+                  </div>
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-4">
                     {pendingPrescriptions && pendingPrescriptions.length > 0 ? pendingPrescriptions.map((prescription) => (
                       <div key={prescription.prescription_id} className="p-4 rounded-lg border hover:bg-purple-50 transition-colors">
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <h4 className="font-semibold">
-                              {prescription.appointment.patient.first_name} {prescription.appointment.patient.last_name}
-                            </h4>
-                            <p className="text-sm text-muted-foreground">
-                              {prescription.medicine.name} - {prescription.quantity} {prescription.medicine.type}
-                            </p>
-                            <p className="text-xs text-gray-500">
-                              Bác sĩ: {prescription.appointment.doctor.first_name} {prescription.appointment.doctor.last_name}
-                            </p>
-                            <p className="text-xs text-gray-500">
-                              {new Date(prescription.prescription_date).toLocaleDateString('vi-VN')}
-                            </p>
+                        <div className="space-y-3">
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <h4 className="font-semibold">
+                                Bệnh nhân: {prescription.patient.first_name} {prescription.patient.last_name}
+                              </h4>
+                              <p className="text-xs text-gray-500">
+                                Bác sĩ: {prescription.doctor.first_name} {prescription.doctor.last_name} ({prescription.doctor.specialty})
+                              </p>
+                              {prescription.diagnosis && (
+                                <p className="text-xs text-gray-600 mt-1">
+                                  <span className="font-medium">Chẩn đoán:</span> {prescription.diagnosis}
+                                </p>
+                              )}
+                              <p className="text-xs text-gray-500">
+                                {new Date(prescription.prescription_date).toLocaleDateString('vi-VN')}
+                              </p>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <Badge variant={getStatusBadgeVariant(prescription.status)}>
+                                {getStatusInVietnamese(prescription.status)}
+                              </Badge>
+                              <Button 
+                                size="sm" 
+                                onClick={() => handleDispensePrescription(prescription)}
+                                className="bg-green-600 hover:bg-green-700"
+                                disabled={prescription.status === 'Filled'}
+                              >
+                                <CheckCircle className="h-3 w-3 mr-1" />
+                                {prescription.status === 'Filled' ? 'Đã cấp phát' : 'Cấp phát'}
+                              </Button>
+                            </div>
                           </div>
-                          <div className="flex items-center gap-2">
-                            <Badge variant="outline" className="bg-purple-100 text-purple-800">
-                              {prescription.status}
-                            </Badge>
-                            <Button size="sm" className="bg-green-600 hover:bg-green-700">
-                              <CheckCircle className="h-3 w-3 mr-1" />
-                              Xử lý
-                            </Button>
+                          
+                          {/* Medicine items list */}
+                          <div className="pl-4 border-l-2 border-green-500 space-y-2">
+                            {prescription.items && prescription.items.length > 0 ? prescription.items.map((item) => (
+                              <div key={item.item_id} className="text-sm">
+                                <p className="font-medium text-gray-900">
+                                  {item.medicine.name} - {item.medicine.brand}
+                                </p>
+                                <p className="text-xs text-gray-600">
+                                  Số lượng: <span className="font-medium">{item.quantity}</span>
+                                  {item.dosage && ` | Liều dùng: ${item.dosage}`}
+                                  {item.frequency && ` | Tần suất: ${item.frequency}`}
+                                  {item.duration && ` | Thời gian: ${item.duration}`}
+                                </p>
+                                {item.instructions && (
+                                  <p className="text-xs text-gray-500 italic">
+                                    {item.instructions}
+                                  </p>
+                                )}
+                                <p className="text-xs text-gray-500">
+                                  Tồn kho: <span className={item.medicine.stock_quantity < item.quantity ? "text-red-600 font-medium" : "text-green-600"}>
+                                    {item.medicine.stock_quantity}
+                                  </span>
+                                </p>
+                              </div>
+                            )) : (
+                              <p className="text-xs text-gray-500">Không có thuốc trong đơn</p>
+                            )}
                           </div>
+
+                          {prescription.instructions && (
+                            <p className="text-xs text-gray-600 italic mt-2">
+                              <span className="font-medium">Ghi chú:</span> {prescription.instructions}
+                            </p>
+                          )}
                         </div>
                       </div>
                     )) : (
@@ -486,11 +749,20 @@ export default function PharmacyDashboard() {
             <TabsContent value="inventory" className="space-y-6">
               <Card>
                 <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Package className="h-5 w-5 text-blue-600" />
-                    Kho thuốc ({filteredMedicines.length})
-                  </CardTitle>
-                  <div className="flex items-center gap-4">
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="flex items-center gap-2">
+                      <Package className="h-5 w-5 text-blue-600" />
+                      Kho thuốc ({filteredMedicines.length})
+                    </CardTitle>
+                    <Button 
+                      onClick={() => setAddMedicineOpen(true)}
+                      className="bg-green-600 hover:bg-green-700"
+                    >
+                      <Plus className="h-4 w-4 mr-2" />
+                      Thêm thuốc
+                    </Button>
+                  </div>
+                  <div className="flex items-center gap-4 mt-4">
                     <div className="relative flex-1 max-w-sm">
                       <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
                       <Input
@@ -511,7 +783,6 @@ export default function PharmacyDashboard() {
                           <TableHead>Loại</TableHead>
                           <TableHead>Thương hiệu</TableHead>
                           <TableHead>Tồn kho</TableHead>
-                          <TableHead>Giá</TableHead>
                           <TableHead>Hạn dùng</TableHead>
                           <TableHead>Thao tác</TableHead>
                         </TableRow>
@@ -527,9 +798,8 @@ export default function PharmacyDashboard() {
                                 {medicine.stock_quantity}
                               </Badge>
                             </TableCell>
-                            <TableCell>{medicine.unit_price.toLocaleString('vi-VN')} đ</TableCell>
                             <TableCell>
-                              {new Date(medicine.expiry_date).toLocaleDateString('vi-VN')}
+                              {medicine.expiry_date ? new Date(medicine.expiry_date).toLocaleDateString('vi-VN') : 'N/A'}
                             </TableCell>
                             <TableCell>
                               <Button size="sm" variant="outline">
@@ -556,27 +826,43 @@ export default function PharmacyDashboard() {
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
+                  <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg mb-4">
+                    <p className="text-sm text-blue-800">
+                      💡 <strong>Mẹo:</strong> Chọn đơn thuốc từ tab "Đơn thuốc chờ" rồi nhấn "Chi tiết" để điền form tự động
+                    </p>
+                  </div>
+                  
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
-                      <Label>ID Bệnh nhân</Label>
+                      <Label>ID Bệnh nhân *</Label>
                       <Input
                         type="number"
                         placeholder="Nhập ID bệnh nhân"
                         value={dispenseForm.patient_id}
                         onChange={(e) => setDispenseForm(prev => ({...prev, patient_id: e.target.value}))}
                       />
+                      <p className="text-xs text-gray-500">Ví dụ: 1, 2, 3...</p>
                     </div>
                     <div className="space-y-2">
-                      <Label>ID Thuốc</Label>
-                      <Input
-                        type="number"
-                        placeholder="Nhập ID thuốc"
-                        value={dispenseForm.medicine_id}
-                        onChange={(e) => setDispenseForm(prev => ({...prev, medicine_id: e.target.value}))}
-                      />
+                      <Label>Chọn thuốc *</Label>
+                      <Select 
+                        value={dispenseForm.medicine_id} 
+                        onValueChange={(value) => setDispenseForm(prev => ({...prev, medicine_id: value}))}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Chọn thuốc từ kho" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {medicineInventory.map((medicine) => (
+                            <SelectItem key={medicine.medicine_id} value={medicine.medicine_id.toString()}>
+                              {medicine.name} ({medicine.brand}) - Tồn: {medicine.stock_quantity}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                     </div>
                     <div className="space-y-2">
-                      <Label>Số lượng</Label>
+                      <Label>Số lượng *</Label>
                       <Input
                         type="number"
                         placeholder="Nhập số lượng"
@@ -588,15 +874,23 @@ export default function PharmacyDashboard() {
                   <div className="space-y-2">
                     <Label>Ghi chú</Label>
                     <Input
-                      placeholder="Ghi chú thêm..."
+                      placeholder="Ghi chú về liều dùng, tần suất..."
                       value={dispenseForm.notes}
                       onChange={(e) => setDispenseForm(prev => ({...prev, notes: e.target.value}))}
                     />
                   </div>
-                  <Button onClick={handleDispenseMedicine} className="bg-green-600 hover:bg-green-700">
-                    <Save className="h-4 w-4 mr-2" />
-                    Cấp phát thuốc
-                  </Button>
+                  <div className="flex gap-2">
+                    <Button onClick={handleDispenseMedicine} className="bg-green-600 hover:bg-green-700">
+                      <CheckCircle className="h-4 w-4 mr-2" />
+                      Cấp phát thuốc
+                    </Button>
+                    <Button 
+                      variant="outline" 
+                      onClick={() => setDispenseForm({ patient_id: "", medicine_id: "", quantity: "", notes: "" })}
+                    >
+                      Xóa form
+                    </Button>
+                  </div>
                 </CardContent>
               </Card>
             </TabsContent>
@@ -626,6 +920,97 @@ export default function PharmacyDashboard() {
           </Tabs>
         </div>
       </div>
+
+      {/* Add Medicine Dialog */}
+      <Dialog open={addMedicineOpen} onOpenChange={setAddMedicineOpen}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Plus className="h-5 w-5 text-green-600" />
+              Thêm thuốc mới vào kho
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="medicine-name">
+                Tên thuốc <span className="text-red-500">*</span>
+              </Label>
+              <Input
+                id="medicine-name"
+                placeholder="Ví dụ: Paracetamol"
+                value={addMedicineForm.name}
+                onChange={(e) => setAddMedicineForm(prev => ({...prev, name: e.target.value}))}
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="medicine-brand">Thương hiệu</Label>
+                <Input
+                  id="medicine-brand"
+                  placeholder="Ví dụ: Stada"
+                  value={addMedicineForm.brand}
+                  onChange={(e) => setAddMedicineForm(prev => ({...prev, brand: e.target.value}))}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="medicine-type">Loại thuốc</Label>
+                <Input
+                  id="medicine-type"
+                  placeholder="Ví dụ: Giảm đau"
+                  value={addMedicineForm.type}
+                  onChange={(e) => setAddMedicineForm(prev => ({...prev, type: e.target.value}))}
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="medicine-dosage">Liều lượng</Label>
+              <Input
+                id="medicine-dosage"
+                placeholder="Ví dụ: 500mg"
+                value={addMedicineForm.dosage}
+                onChange={(e) => setAddMedicineForm(prev => ({...prev, dosage: e.target.value}))}
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="medicine-quantity">Số lượng tồn kho</Label>
+                <Input
+                  id="medicine-quantity"
+                  type="number"
+                  placeholder="0"
+                  min="0"
+                  value={addMedicineForm.stock_quantity}
+                  onChange={(e) => setAddMedicineForm(prev => ({...prev, stock_quantity: e.target.value}))}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="medicine-expiry">Ngày hết hạn</Label>
+                <Input
+                  id="medicine-expiry"
+                  type="date"
+                  value={addMedicineForm.expiry_date}
+                  onChange={(e) => setAddMedicineForm(prev => ({...prev, expiry_date: e.target.value}))}
+                />
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setAddMedicineOpen(false)}>
+              Hủy
+            </Button>
+            <Button 
+              onClick={handleAddMedicine}
+              className="bg-green-600 hover:bg-green-700"
+            >
+              <Save className="h-4 w-4 mr-2" />
+              Lưu thuốc
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

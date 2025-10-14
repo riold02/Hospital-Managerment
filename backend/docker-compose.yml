@@ -21,6 +21,9 @@ services:
       - ./prisma/migrations/001_initial_schema.sql:/docker-entrypoint-initdb.d/01-initial-schema.sql:ro
       - ./prisma/migrations/002_rbac_system.sql:/docker-entrypoint-initdb.d/02-rbac-system.sql:ro
       - ./prisma/migrations/003_seed_data.sql:/docker-entrypoint-initdb.d/03-seed-data.sql:ro
+      - ./prisma/migrations/004_payment_transactions.sql:/docker-entrypoint-initdb.d/04-payment-transactions.sql:ro
+      - ./prisma/migrations/005_add_payment_method.sql:/docker-entrypoint-initdb.d/05-add-payment-method.sql:ro
+      - ./prisma/migrations/006_add_prescription_items.sql:/docker-entrypoint-initdb.d/06-add-prescription-items.sql:ro
     ports:
       - "5432:5432"
     networks:

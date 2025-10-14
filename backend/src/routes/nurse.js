@@ -5,7 +5,7 @@ const { authenticateToken, requireRole } = require('../middleware/auth');
 
 // Apply authentication and nurse role requirement to all nurse routes
 router.use(authenticateToken);
-router.use(requireRole(['nurse', 'admin']));
+router.use(requireRole('nurse', 'admin'));
 
 /**
  * @swagger

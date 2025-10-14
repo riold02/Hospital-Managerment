@@ -1,4 +1,4 @@
-const prisma = require('../config/prisma');
+const { prisma } = require('../config/prisma');
 
 /**
  * Nurse Dashboard Controller
@@ -19,18 +19,9 @@ const getNurseDashboard = async (req, res) => {
       recentActivities
     ] = await Promise.all([
       // Assigned inpatients
-      prisma.room_assignment.findMany({
+      prisma.room_assignments.findMany({
         where: {
-          discharge_date: null,
-          room: {
-            department: {
-              staff: {
-                some: {
-                  user_id: nurseId
-                }
-              }
-            }
-          }
+          end_date: null
         },
         include: {
           patient: {
@@ -39,63 +30,60 @@ const getNurseDashboard = async (req, res) => {
               first_name: true,
               last_name: true,
               date_of_birth: true,
-              medical_conditions: true
+              medical_history: true
             }
           },
           room: {
             select: {
-              room_number: true,
-              department: {
-                select: {
-                  department_name: true
-                }
-              }
+              room_number: true
             }
           }
         }
       }),
       
       // Today's medications to administer
-      prisma.prescription.findMany({
+      prisma.prescriptions.findMany({
         where: {
           created_at: {
             gte: new Date(new Date().setHours(0, 0, 0, 0)),
             lt: new Date(new Date().setHours(23, 59, 59, 999))
           },
-          appointment: {
-            patient: {
-              room_assignments: {
-                some: {
-                  discharge_date: null
-                }
+          patient: {
+            room_assignments: {
+              some: {
+                end_date: null
               }
             }
           }
         },
         include: {
-          prescription_items: {
+          items: {
             include: {
               medicine: true
             }
           },
-          appointment: {
-            include: {
-              patient: {
-                select: {
-                  patient_id: true,
-                  first_name: true,
-                  last_name: true
-                }
-              }
+          patient: {
+            select: {
+              patient_id: true,
+              first_name: true,
+              last_name: true
+            }
+          },
+          doctor: {
+            select: {
+              doctor_id: true,
+              first_name: true,
+              last_name: true,
+              specialty: true
             }
           }
         }
       }),
       
       // Patients needing vital signs check
-      prisma.room_assignment.count({
+      prisma.room_assignments.count({
         where: {
-          discharge_date: null,
+          end_date: null,
           patient: {
             medical_records: {
               some: {
@@ -109,14 +97,14 @@ const getNurseDashboard = async (req, res) => {
       }),
       
       // Critical alerts count
-      prisma.patient.count({
+      prisma.patients.count({
         where: {
-          medical_conditions: {
+          medical_history: {
             contains: 'critical'
           },
           room_assignments: {
             some: {
-              discharge_date: null
+              end_date: null
             }
           }
         }
@@ -128,19 +116,19 @@ const getNurseDashboard = async (req, res) => {
           user_id: nurseId
         },
         include: {
-          department: true
+          departments: true
         }
       }),
       
       // Recent medical records
-      prisma.medical_record.findMany({
+      prisma.medical_records.findMany({
         take: 10,
         orderBy: { created_at: 'desc' },
         where: {
           patient: {
             room_assignments: {
               some: {
-                discharge_date: null
+                end_date: null
               }
             }
           }
@@ -156,10 +144,34 @@ const getNurseDashboard = async (req, res) => {
       })
     ]);
 
+    // Get today's appointments count
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+    const todayEnd = new Date();
+    todayEnd.setHours(23, 59, 59, 999);
+
+    const todayAppointments = await prisma.appointments.count({
+      where: {
+        appointment_date: {
+          gte: todayStart,
+          lte: todayEnd
+        }
+      }
+    });
+
+    // Get total patients count
+    const totalPatients = await prisma.patients.count();
+
     const dashboardData = {
+      // Frontend expects these exact field names
+      totalPatients: totalPatients,
+      activeRoomAssignments: assignedPatients.length,
+      totalMedicine: todayMedications.reduce((sum, p) => sum + (p.items?.length || 0), 0),
+      todayAppointments: todayAppointments,
+      // Additional data for detailed views
       overview: {
         assignedPatients: assignedPatients.length,
-        todayMedications: todayMedications.reduce((sum, p) => sum + p.prescription_items.length, 0),
+        todayMedications: todayMedications.reduce((sum, p) => sum + (p.items?.length || 0), 0),
         vitalSignsPending,
         criticalAlerts
       },
@@ -187,18 +199,10 @@ const getAssignedPatients = async (req, res) => {
   try {
     const nurseId = req.user.user_id;
     
-    const patients = await prisma.room_assignment.findMany({
+    const patients = await prisma.room_assignments.findMany({
       where: {
-        discharge_date: null,
-        room: {
-          department: {
-            staff: {
-              some: {
-                user_id: nurseId
-              }
-            }
-          }
-        }
+        end_date: null,
+        assignment_type: 'Patient'
       },
       include: {
         patient: {
@@ -210,8 +214,11 @@ const getAssignedPatients = async (req, res) => {
           }
         },
         room: {
-          include: {
-            department: true
+          select: {
+            room_id: true,
+            room_number: true,
+            capacity: true,
+            status: true
           }
         }
       }
@@ -275,7 +282,7 @@ const getMedicationSchedule = async (req, res) => {
     const { date } = req.query;
     const targetDate = date ? new Date(date) : new Date();
     
-    const medications = await prisma.prescription.findMany({
+    const medications = await prisma.prescriptions.findMany({
       where: {
         created_at: {
           gte: new Date(targetDate.setHours(0, 0, 0, 0)),
@@ -283,28 +290,32 @@ const getMedicationSchedule = async (req, res) => {
         }
       },
       include: {
-        prescription_items: {
+        items: {
           include: {
             medicine: true
           }
         },
-        appointment: {
-          include: {
-            patient: {
-              select: {
-                patient_id: true,
-                first_name: true,
-                last_name: true,
-                room_assignments: {
-                  where: {
-                    discharge_date: null
-                  },
-                  include: {
-                    room: true
-                  }
-                }
+        patient: {
+          select: {
+            patient_id: true,
+            first_name: true,
+            last_name: true,
+            room_assignments: {
+              where: {
+                end_date: null
+              },
+              include: {
+                room: true
               }
             }
+          }
+        },
+        doctor: {
+          select: {
+            doctor_id: true,
+            first_name: true,
+            last_name: true,
+            specialty: true
           }
         }
       }

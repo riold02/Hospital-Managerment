@@ -14,10 +14,6 @@ const authenticateToken = async (req, res, next) => {
     const authHeader = req.headers['authorization'];
     const token = authHeader && authHeader.split(' ')[1]; // Bearer TOKEN
 
-    console.log('Auth header:', authHeader);
-    console.log('Extracted token:', token);
-    console.log('Token length:', token?.length);
-
     if (!token) {
       return res.status(401).json({
         success: false,
@@ -67,6 +63,12 @@ const authenticateToken = async (req, res, next) => {
             position: true,
             department_id: true
           }
+        },
+        doctor: {
+          select: {
+            doctor_id: true,
+            specialty: true
+          }
         }
       }
     });
@@ -113,6 +115,7 @@ const authenticateToken = async (req, res, next) => {
       // Related data
       patient_id: user.patient?.patient_id || null,
       staff_id: user.staff_member?.staff_id || null,
+      doctor_id: user.doctor?.doctor_id || null,
       department_id: user.staff_member?.department_id || null,
       
       // Profile information

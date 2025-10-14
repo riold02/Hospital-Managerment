@@ -1,10 +1,14 @@
 import { apiClient } from '../api-client'
 
 export interface PharmacyDashboardData {
-  totalMedicines: number
-  totalPharmacyRecords: number
-  lowStockCount: number
-  pendingPrescriptions: number
+  overview: {
+    pendingPrescriptions: number
+    lowStockMedicines: number
+    todayDispensed: number
+    totalMedicines: number
+    expiringMedicines: number
+  }
+  recentPrescriptions: any[]
 }
 
 export interface Medicine {
@@ -47,35 +51,45 @@ export interface PharmacyRecord {
   }
 }
 
-export interface PendingPrescription {
+export interface PrescriptionItem {
+  item_id: number
   prescription_id: number
-  appointment_id: number
   medicine_id: number
   quantity: number
-  dosage: string
-  frequency: string
-  duration: string
-  status: string
-  prescription_date: string
-  appointment: {
-    patient: {
-      patient_id: number
-      first_name: string
-      last_name: string
-      patient_code: string
-    }
-    doctor: {
-      doctor_id: number
-      first_name: string
-      last_name: string
-    }
-  }
+  dosage: string | null
+  frequency: string | null
+  duration: string | null
+  instructions: string | null
   medicine: {
     medicine_id: number
     name: string
     type: string
     brand: string
+    stock_quantity: number
   }
+}
+
+export interface PendingPrescription {
+  prescription_id: number
+  patient_id: number
+  prescribed_by: number
+  diagnosis: string | null
+  instructions: string | null
+  status: string
+  prescription_date: string
+  patient: {
+    patient_id: number
+    first_name: string
+    last_name: string
+    patient_code: string
+  }
+  doctor: {
+    doctor_id: number
+    first_name: string
+    last_name: string
+    specialty: string
+  }
+  items: PrescriptionItem[]
 }
 
 export interface PharmacyStatistics {
@@ -90,14 +104,15 @@ export interface PharmacyStatistics {
 export class PharmacyApiService {
   // Get pharmacy dashboard overview
   async getDashboard(): Promise<PharmacyDashboardData> {
-    const response = await apiClient.get<{success: boolean, data: PharmacyDashboardData}>('/pharmacy/dashboard')
+    const response = await apiClient.get<{success: boolean, data: PharmacyDashboardData}>('/pharmacy/pharmacist/dashboard')
     return response.data
   }
 
-  // Get pending prescriptions
+  // Get pending prescriptions (with optional status filter)
   async getPendingPrescriptions(params?: {
     page?: number
     limit?: number
+    status?: string // 'all', 'Active', 'Filled', 'Cancelled', 'Expired'
   }): Promise<{
     data: PendingPrescription[]
     pagination: any
@@ -105,12 +120,13 @@ export class PharmacyApiService {
     const queryParams = new URLSearchParams()
     if (params?.page) queryParams.append('page', params.page.toString())
     if (params?.limit) queryParams.append('limit', params.limit.toString())
+    if (params?.status) queryParams.append('status', params.status)
 
     const response = await apiClient.get<{
       success: boolean
       data: PendingPrescription[]
       pagination: any
-    }>(`/pharmacy/pending-prescriptions?${queryParams}`)
+    }>(`/pharmacy/prescriptions/pending?${queryParams}`)
     
     return {
       data: response.data,
@@ -140,7 +156,7 @@ export class PharmacyApiService {
       success: boolean
       data: Medicine[]
       pagination: any
-    }>(`/pharmacy/medicine-inventory?${queryParams}`)
+    }>(`/pharmacy/inventory?${queryParams}`)
     
     return {
       data: response.data,
@@ -178,7 +194,7 @@ export class PharmacyApiService {
       success: boolean
       data: Medicine[]
       pagination: any
-    }>(`/pharmacy/expiring-medicines?${queryParams}`)
+    }>(`/pharmacy/medicines/expiring?${queryParams}`)
     
     return {
       data: response.data,
@@ -206,7 +222,7 @@ export class PharmacyApiService {
       success: boolean
       data: PharmacyRecord[]
       pagination: any
-    }>(`/pharmacy/records?${queryParams}`)
+    }>(`/pharmacy?${queryParams}`)
     
     return {
       data: response.data,
@@ -247,17 +263,14 @@ export class PharmacyApiService {
     }
   }
 
-  // Dispense medicine
+  // Dispense medicine for prescription (dispenses all items)
   async dispenseMedicine(data: {
-    patient_id: number
-    medicine_id: number
-    quantity: number
-    notes?: string
-  }): Promise<PharmacyRecord> {
+    prescription_id: number
+  }): Promise<PharmacyRecord[]> {
     const response = await apiClient.post<{
       success: boolean
-      data: PharmacyRecord
-    }>('/pharmacy/dispense', data)
+      data: PharmacyRecord[]
+    }>('/pharmacy/', { prescription_id: data.prescription_id })
     return response.data
   }
 

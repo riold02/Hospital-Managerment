@@ -2,7 +2,7 @@ const { prisma } = require('../config/prisma');
 const { validationResult } = require('express-validator');
 
 class PrescriptionController {
-  // Create prescription
+  // Create prescription with multiple medicines
   async createPrescription(req, res) {
     try {
       const errors = validationResult(req);
@@ -14,41 +14,106 @@ class PrescriptionController {
         });
       }
 
-      const prescriptionData = {
-        patient_id: Number(req.body.patient_id),
-        prescribed_by: req.user.id, // Doctor who prescribed
-        prescription_date: req.body.prescription_date ? new Date(req.body.prescription_date) : new Date(),
-        medication: req.body.medication,
-        dosage: req.body.dosage || null,
-        frequency: req.body.frequency || null,
-        duration: req.body.duration || null,
-        instructions: req.body.instructions || null,
-        status: req.body.status || 'Active'
-      };
+      // Get doctor_id from user
+      if (!req.user.doctor_id) {
+        return res.status(403).json({
+          success: false,
+          error: 'Only doctors can create prescriptions'
+        });
+      }
 
-      const data = await prisma.prescriptions.create({
-        data: prescriptionData,
-        include: {
-          patient: {
-            select: {
-              patient_id: true,
-              first_name: true,
-              last_name: true,
-              email: true,
-              date_of_birth: true,
-              gender: true
-            }
-          },
-          doctor: {
-            select: {
-              doctor_id: true,
-              first_name: true,
-              last_name: true,
-              specialty: true
+      const { patient_id, diagnosis, instructions, items } = req.body;
+
+      // Validate items array
+      if (!items || !Array.isArray(items) || items.length === 0) {
+        return res.status(400).json({
+          success: false,
+          error: 'Prescription must have at least one medicine item'
+        });
+      }
+
+      // Create prescription with items in transaction
+      const result = await prisma.$transaction(async (tx) => {
+        // Create prescription
+        const prescription = await tx.prescriptions.create({
+          data: {
+            patient_id: Number(patient_id),
+            prescribed_by: req.user.doctor_id,
+            prescribed_by_user_id: req.user.user_id,
+            prescription_date: new Date(),
+            diagnosis: diagnosis || null,
+            instructions: instructions || null,
+            status: 'Active' // Active = Chờ cấp phát
+          }
+        });
+
+        // Create prescription items
+        const prescriptionItems = await Promise.all(
+          items.map(item => 
+            tx.prescription_items.create({
+              data: {
+                prescription_id: prescription.prescription_id,
+                medicine_id: Number(item.medicine_id),
+                quantity: Number(item.quantity) || 1,
+                dosage: item.dosage || null,
+                frequency: item.frequency || null,
+                duration: item.duration || null,
+                instructions: item.instructions || null
+              },
+              include: {
+                medicine: {
+                  select: {
+                    medicine_id: true,
+                    name: true,
+                    type: true,
+                    brand: true
+                  }
+                }
+              }
+            })
+          )
+        );
+
+        // Return full prescription with items
+        return await tx.prescriptions.findUnique({
+          where: { prescription_id: prescription.prescription_id },
+          include: {
+            patient: {
+              select: {
+                patient_id: true,
+                first_name: true,
+                last_name: true,
+                email: true,
+                date_of_birth: true,
+                gender: true
+              }
+            },
+            doctor: {
+              select: {
+                doctor_id: true,
+                first_name: true,
+                last_name: true,
+                specialty: true
+              }
+            },
+            items: {
+              include: {
+                medicine: {
+                  select: {
+                    medicine_id: true,
+                    name: true,
+                    type: true,
+                    brand: true,
+                    stock_quantity: true
+                  }
+                }
+              }
             }
           }
-        }
+        });
       });
+
+      const data = result;
 
       res.status(201).json({
         success: true,

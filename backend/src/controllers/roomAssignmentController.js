@@ -61,11 +61,14 @@ class RoomAssignmentController {
 
       // Use transaction to create assignment and update room status
       const result = await prisma.$transaction(async (tx) => {
+        // Convert assignment_type to lowercase for database constraint
+        const assignmentTypeLower = assignment_type.toLowerCase();
+        
         const assignmentData = {
           room_id: Number(room_id),
-          assignment_type,
-          patient_id: assignment_type === 'Patient' ? Number(patient_id) : null,
-          staff_id: assignment_type === 'Staff' ? Number(staff_id) : null,
+          assignment_type: assignmentTypeLower,
+          patient_id: assignmentTypeLower === 'patient' ? Number(patient_id) : null,
+          staff_id: assignmentTypeLower === 'staff' ? Number(staff_id) : null,
           start_date: new Date(start_date),
           end_date: end_date ? new Date(end_date) : null
         };
@@ -79,7 +82,7 @@ class RoomAssignmentController {
                 room_number: true,
                 room_type: {
                   select: {
-                    room_type_name: true
+                    type_name: true
                   }
                 }
               }
@@ -103,11 +106,23 @@ class RoomAssignmentController {
           }
         });
 
-        // Update room status if it's a patient assignment
-        if (assignment_type === 'Patient') {
+        // Update room occupancy and status if it's a patient assignment
+        if (assignmentTypeLower === 'patient') {
+          // Get current room info
+          const room = await tx.rooms.findUnique({
+            where: { room_id: Number(room_id) },
+            select: { capacity: true, current_occupancy: true }
+          });
+
+          const newOccupancy = (room.current_occupancy || 0) + 1;
+          const newStatus = newOccupancy >= room.capacity ? 'occupied' : 'available';
+
           await tx.rooms.update({
             where: { room_id: Number(room_id) },
-            data: { status: 'Occupied' }
+            data: { 
+              current_occupancy: newOccupancy,
+              status: newStatus
+            }
           });
         }
 
@@ -163,7 +178,7 @@ class RoomAssignmentController {
                 room_number: true,
                 room_type: {
                   select: {
-                    room_type_name: true
+                    type_name: true
                   }
                 }
               }
@@ -229,7 +244,7 @@ class RoomAssignmentController {
               room_type: {
                 select: {
                   room_type_id: true,
-                  room_type_name: true,
+                  type_name: true,
                   description: true
                 }
               }
@@ -316,7 +331,7 @@ class RoomAssignmentController {
                 room_number: true,
                 room_type: {
                   select: {
-                    room_type_name: true
+                    type_name: true
                   }
                 }
               }
@@ -339,11 +354,23 @@ class RoomAssignmentController {
           }
         });
 
-        // If end_date is set, update room status to available
-        if (updateData.end_date && data.assignment_type === 'Patient') {
+        // If end_date is set, update room occupancy and status
+        if (updateData.end_date && data.assignment_type === 'patient') {
+          // Get current room info
+          const room = await tx.rooms.findUnique({
+            where: { room_id: data.room_id },
+            select: { capacity: true, current_occupancy: true }
+          });
+
+          const newOccupancy = Math.max((room.current_occupancy || 0) - 1, 0);
+          const newStatus = newOccupancy === 0 ? 'available' : (newOccupancy >= room.capacity ? 'occupied' : 'available');
+
           await tx.rooms.update({
             where: { room_id: data.room_id },
-            data: { status: 'Available' }
+            data: { 
+              current_occupancy: newOccupancy,
+              status: newStatus
+            }
           });
         }
 
@@ -387,11 +414,23 @@ class RoomAssignmentController {
           }
         });
 
-        // Update room status to available if it was a patient assignment
-        if (data.assignment_type === 'Patient') {
+        // Update room occupancy and status if it was a patient assignment
+        if (data.assignment_type === 'patient') {
+          // Get current room info
+          const room = await tx.rooms.findUnique({
+            where: { room_id: data.room_id },
+            select: { capacity: true, current_occupancy: true }
+          });
+
+          const newOccupancy = Math.max((room.current_occupancy || 0) - 1, 0);
+          const newStatus = newOccupancy === 0 ? 'available' : (newOccupancy >= room.capacity ? 'occupied' : 'available');
+
           await tx.rooms.update({
             where: { room_id: data.room_id },
-            data: { status: 'Available' }
+            data: { 
+              current_occupancy: newOccupancy,
+              status: newStatus
+            }
           });
         }
 
@@ -433,11 +472,23 @@ class RoomAssignmentController {
           where: { assignment_id: Number(id) }
         });
 
-        // Update room status to available if it was an active patient assignment
-        if (assignment.assignment_type === 'Patient' && !assignment.end_date) {
+        // Update room occupancy and status if it was an active patient assignment
+        if (assignment.assignment_type === 'patient' && !assignment.end_date) {
+          // Get current room info
+          const room = await tx.rooms.findUnique({
+            where: { room_id: assignment.room_id },
+            select: { capacity: true, current_occupancy: true }
+          });
+
+          const newOccupancy = Math.max((room.current_occupancy || 0) - 1, 0);
+          const newStatus = newOccupancy === 0 ? 'available' : (newOccupancy >= room.capacity ? 'occupied' : 'available');
+
           await tx.rooms.update({
             where: { room_id: assignment.room_id },
-            data: { status: 'Available' }
+            data: { 
+              current_occupancy: newOccupancy,
+              status: newStatus
+            }
           });
         }
 
