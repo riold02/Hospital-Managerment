@@ -104,7 +104,7 @@ export interface PharmacyStatistics {
 export class PharmacyApiService {
   // Get pharmacy dashboard overview
   async getDashboard(): Promise<PharmacyDashboardData> {
-    const response = await apiClient.get<{success: boolean, data: PharmacyDashboardData}>('/pharmacy/pharmacist/dashboard')
+    const response = await apiClient.getRaw<{success: boolean, data: PharmacyDashboardData}>('/pharmacy/pharmacist/dashboard')
     return response.data
   }
 
@@ -122,7 +122,7 @@ export class PharmacyApiService {
     if (params?.limit) queryParams.append('limit', params.limit.toString())
     if (params?.status) queryParams.append('status', params.status)
 
-    const response = await apiClient.get<{
+    const response = await apiClient.getRaw<{
       success: boolean
       data: PendingPrescription[]
       pagination: any
@@ -152,7 +152,7 @@ export class PharmacyApiService {
     if (params?.category) queryParams.append('category', params.category)
     if (params?.low_stock) queryParams.append('low_stock', 'true')
 
-    const response = await apiClient.get<{
+    const response = await apiClient.getRaw<{
       success: boolean
       data: Medicine[]
       pagination: any
@@ -190,7 +190,7 @@ export class PharmacyApiService {
     if (params?.page) queryParams.append('page', params.page.toString())
     if (params?.limit) queryParams.append('limit', params.limit.toString())
 
-    const response = await apiClient.get<{
+    const response = await apiClient.getRaw<{
       success: boolean
       data: Medicine[]
       pagination: any
@@ -218,7 +218,7 @@ export class PharmacyApiService {
     if (params?.date_from) queryParams.append('date_from', params.date_from)
     if (params?.date_to) queryParams.append('date_to', params.date_to)
 
-    const response = await apiClient.get<{
+    const response = await apiClient.getRaw<{
       success: boolean
       data: PharmacyRecord[]
       pagination: any
@@ -232,7 +232,7 @@ export class PharmacyApiService {
 
   // Get pharmacy statistics
   async getPharmacyStatistics(): Promise<PharmacyStatistics> {
-    const response = await apiClient.get<{
+    const response = await apiClient.getRaw<{
       success: boolean
       data: PharmacyStatistics
     }>('/pharmacy/statistics')
@@ -251,7 +251,7 @@ export class PharmacyApiService {
     const queryParams = new URLSearchParams()
     if (date) queryParams.append('date', date)
 
-    const response = await apiClient.get<{
+    const response = await apiClient.getRaw<{
       success: boolean
       data: PharmacyRecord[]
       summary: any
@@ -286,7 +286,7 @@ export class PharmacyApiService {
     if (params?.page) queryParams.append('page', params.page.toString())
     if (params?.limit) queryParams.append('limit', params.limit.toString())
 
-    const response = await apiClient.get<{
+    const response = await apiClient.getRaw<{
       success: boolean
       data: PharmacyRecord[]
       pagination: any
@@ -310,7 +310,7 @@ export class PharmacyApiService {
     if (params?.page) queryParams.append('page', params.page.toString())
     if (params?.limit) queryParams.append('limit', params.limit.toString())
 
-    const response = await apiClient.get<{
+    const response = await apiClient.getRaw<{
       success: boolean
       data: PharmacyRecord[]
       pagination: any

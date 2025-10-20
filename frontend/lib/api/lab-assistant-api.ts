@@ -64,7 +64,7 @@ export interface CollectionSchedule {
 export class LabAssistantApiService {
   // Get lab assistant dashboard overview
   async getDashboard(): Promise<LabDashboardData> {
-    const response = await apiClient.get<{success: boolean, data: LabDashboardData}>('/lab-assistant/dashboard')
+    const response = await apiClient.getRaw<{success: boolean, data: LabDashboardData}>('/lab-assistant/dashboard')
     return response.data
   }
 
@@ -82,7 +82,7 @@ export class LabAssistantApiService {
     if (params?.limit) queryParams.append('limit', params.limit.toString())
     if (params?.priority) queryParams.append('priority', params.priority)
 
-    const response = await apiClient.get<{
+    const response = await apiClient.getRaw<{
       success: boolean
       data: SampleToCollect[]
       pagination: any
@@ -120,7 +120,7 @@ export class LabAssistantApiService {
     if (params?.limit) queryParams.append('limit', params.limit.toString())
     if (params?.status) queryParams.append('status', params.status)
 
-    const response = await apiClient.get<{
+    const response = await apiClient.getRaw<{
       success: boolean
       data: ProcessingQueue[]
       pagination: any
@@ -161,7 +161,7 @@ export class LabAssistantApiService {
     if (params?.search) queryParams.append('search', params.search)
     if (params?.low_stock) queryParams.append('low_stock', 'true')
 
-    const response = await apiClient.get<{
+    const response = await apiClient.getRaw<{
       success: boolean
       data: LabInventoryItem[]
       pagination: any
@@ -201,7 +201,7 @@ export class LabAssistantApiService {
     if (params?.limit) queryParams.append('limit', params.limit.toString())
     if (params?.date) queryParams.append('date', params.date)
 
-    const response = await apiClient.get<{
+    const response = await apiClient.getRaw<{
       success: boolean
       data: CollectionSchedule[]
       pagination: any

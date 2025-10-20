@@ -130,11 +130,11 @@ export default function PatientListTab({ onRefresh }: PatientListTabProps) {
     }
   }
 
-  const filteredPatients = patients.filter(assignment => {
+  const filteredPatients = (patients || []).filter(assignment => {
     const patient = assignment.patient
     const fullName = `${patient.first_name} ${patient.last_name}`.toLowerCase()
     const matchesSearch = fullName.includes(searchTerm.toLowerCase()) ||
-                         assignment.room.room_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         assignment.room?.room_number?.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          patient.patient_id.toString().includes(searchTerm)
     
     const status = getPatientStatus(assignment)
@@ -230,7 +230,7 @@ export default function PatientListTab({ onRefresh }: PatientListTabProps) {
 
             <div className="flex items-end">
               <p className="text-sm text-muted-foreground">
-                Hiển thị <span className="font-semibold text-primary">{filteredPatients.length}</span> / <span className="font-semibold">{patients.length}</span> bệnh nhân
+                Hiển thị <span className="font-semibold text-primary">{filteredPatients.length}</span> / <span className="font-semibold">{patients?.length || 0}</span> bệnh nhân
               </p>
             </div>
           </div>

@@ -667,10 +667,10 @@ export default function PharmacyDashboard() {
                           <div className="flex items-center justify-between">
                             <div>
                               <h4 className="font-semibold">
-                                Bệnh nhân: {prescription.patient.first_name} {prescription.patient.last_name}
+                                Bệnh nhân: {prescription.patient ? `${prescription.patient.first_name} ${prescription.patient.last_name}` : 'N/A'}
                               </h4>
                               <p className="text-xs text-gray-500">
-                                Bác sĩ: {prescription.doctor.first_name} {prescription.doctor.last_name} ({prescription.doctor.specialty})
+                                Bác sĩ: {prescription.doctor ? `${prescription.doctor.first_name} ${prescription.doctor.last_name} (${prescription.doctor.specialty})` : 'N/A'}
                               </p>
                               {prescription.diagnosis && (
                                 <p className="text-xs text-gray-600 mt-1">
@@ -910,10 +910,85 @@ export default function PharmacyDashboard() {
             <TabsContent value="expiring">
               <Card>
                 <CardHeader>
-                  <CardTitle>Thuốc sắp hết hạn</CardTitle>
+                  <CardTitle className="flex items-center gap-2">
+                    <AlertTriangle className="h-5 w-5 text-orange-600" />
+                    Thuốc sắp hết hạn trong vòng 30 ngày
+                  </CardTitle>
+                  <p className="text-sm text-muted-foreground mt-2">
+                    Danh sách các loại thuốc còn hạn dùng nhưng sẽ hết hạn trong vòng 1 tháng tới
+                  </p>
                 </CardHeader>
                 <CardContent>
-                  <p className="text-gray-600">Chức năng thuốc sắp hết hạn đang được phát triển...</p>
+                  {expiringMedicines.length === 0 ? (
+                    <div className="text-center py-8">
+                      <CheckCircle className="h-12 w-12 text-green-500 mx-auto mb-3" />
+                      <p className="text-gray-600">Không có thuốc nào sắp hết hạn trong 30 ngày tới</p>
+                    </div>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Tên thuốc</TableHead>
+                            <TableHead>Loại</TableHead>
+                            <TableHead>Thương hiệu</TableHead>
+                            <TableHead>Tồn kho</TableHead>
+                            <TableHead>Hạn dùng</TableHead>
+                            <TableHead>Còn lại (ngày)</TableHead>
+                            <TableHead>Trạng thái</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {expiringMedicines.map((medicine) => {
+                            const expiryDate = new Date(medicine.expiry_date);
+                            const today = new Date();
+                            const daysLeft = Math.ceil((expiryDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+                            const urgencyLevel = daysLeft <= 7 ? 'critical' : daysLeft <= 15 ? 'warning' : 'normal';
+                            
+                            return (
+                              <TableRow key={medicine.medicine_id} className={
+                                urgencyLevel === 'critical' ? 'bg-red-50' : 
+                                urgencyLevel === 'warning' ? 'bg-orange-50' : 
+                                'bg-yellow-50'
+                              }>
+                                <TableCell className="font-medium">{medicine.name}</TableCell>
+                                <TableCell>{medicine.type}</TableCell>
+                                <TableCell>{medicine.brand}</TableCell>
+                                <TableCell>
+                                  <Badge variant={medicine.stock_quantity < 10 ? "destructive" : "secondary"}>
+                                    {medicine.stock_quantity}
+                                  </Badge>
+                                </TableCell>
+                                <TableCell>
+                                  {expiryDate.toLocaleDateString('vi-VN')}
+                                </TableCell>
+                                <TableCell>
+                                  <Badge variant={
+                                    urgencyLevel === 'critical' ? 'destructive' : 
+                                    urgencyLevel === 'warning' ? 'default' : 
+                                    'secondary'
+                                  }>
+                                    {daysLeft} ngày
+                                  </Badge>
+                                </TableCell>
+                                <TableCell>
+                                  {urgencyLevel === 'critical' && (
+                                    <span className="text-xs text-red-600 font-semibold">🔴 Khẩn cấp</span>
+                                  )}
+                                  {urgencyLevel === 'warning' && (
+                                    <span className="text-xs text-orange-600 font-semibold">⚠️ Cảnh báo</span>
+                                  )}
+                                  {urgencyLevel === 'normal' && (
+                                    <span className="text-xs text-yellow-600 font-semibold">⏰ Theo dõi</span>
+                                  )}
+                                </TableCell>
+                              </TableRow>
+                            );
+                          })}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             </TabsContent>

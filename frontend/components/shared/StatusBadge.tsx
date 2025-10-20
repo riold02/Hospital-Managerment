@@ -19,9 +19,15 @@ const statusConfig = {
     "No Show": { label: "Không đến", variant: "secondary" as const, color: "bg-gray-100 text-gray-800" },
   },
   billing: {
+    PAID: { label: "Đã thanh toán", variant: "default" as const, color: "bg-green-100 text-green-800" },
+    PENDING: { label: "Chờ thanh toán", variant: "secondary" as const, color: "bg-yellow-100 text-yellow-800" },
+    OVERDUE: { label: "Quá hạn", variant: "destructive" as const, color: "bg-red-100 text-red-800" },
+    CANCELLED: { label: "Đã hủy", variant: "destructive" as const, color: "bg-gray-100 text-gray-800" },
+    // Support both uppercase and title case for backward compatibility
     Paid: { label: "Đã thanh toán", variant: "default" as const, color: "bg-green-100 text-green-800" },
     Pending: { label: "Chờ thanh toán", variant: "secondary" as const, color: "bg-yellow-100 text-yellow-800" },
     Overdue: { label: "Quá hạn", variant: "destructive" as const, color: "bg-red-100 text-red-800" },
+    Cancelled: { label: "Đã hủy", variant: "destructive" as const, color: "bg-gray-100 text-gray-800" },
     Partial: { label: "Thanh toán một phần", variant: "outline" as const, color: "bg-orange-100 text-orange-800" },
   },
   room: {

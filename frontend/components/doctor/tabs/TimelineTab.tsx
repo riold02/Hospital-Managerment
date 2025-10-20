@@ -1,6 +1,4 @@
-"use client"
-
-import { useState } from "react"
+import { formatAppointmentTime as formatTime } from "@/lib/utils"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -82,28 +80,7 @@ const TimelineTab = ({
 }: TimelineTabProps) => {
   const formatAppointmentTime = (time: string) => {
     if (!time) return "N/A"
-
-    // Nếu time là ISO string dạng "1970-01-01T09:00:00.000Z"
-    if (typeof time === "string" && time.includes("T")) {
-      try {
-        const date = new Date(time)
-        return date.toLocaleTimeString("vi-VN", {
-          hour: "2-digit",
-          minute: "2-digit",
-          hour12: false,
-        })
-      } catch {
-        return "N/A"
-      }
-    }
-
-    // Nếu time là string dạng "HH:MM:SS" hoặc "HH:MM"
-    if (typeof time === "string" && time.includes(":")) {
-      const parts = time.split(":")
-      return `${parts[0]}:${parts[1]}`
-    }
-
-    return String(time)
+    return formatTime(time)
   }
 
   const getStatusBadge = (status: string) => {

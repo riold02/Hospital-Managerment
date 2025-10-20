@@ -35,7 +35,6 @@ interface PatientProfile {
 interface PatientOverviewProps {
   patientProfile: PatientProfile | null
   appointments: any[]
-  prescriptions: any[]
   medicalHistory: any[]
   billing: any[]
   upcomingAppointments: number
@@ -52,7 +51,6 @@ interface PatientOverviewProps {
 export default function PatientOverview({
   patientProfile,
   appointments,
-  prescriptions,
   medicalHistory,
   billing,
   upcomingAppointments,
@@ -152,24 +150,6 @@ export default function PatientOverview({
               </div>
               <div className="p-4 bg-blue-100 rounded-full">
                 <Calendar className="h-8 w-8 text-blue-600" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="hover:shadow-lg transition-all duration-200 border-l-4 border-l-green-500">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600 mb-1">Đơn thuốc</p>
-                <p className="text-3xl font-bold text-green-600">{prescriptions.length}</p>
-                <div className="flex items-center mt-2">
-                  <Clock className="h-4 w-4 text-orange-500 mr-1" />
-                  <p className="text-xs text-orange-600 font-medium">Tổng số</p>
-                </div>
-              </div>
-              <div className="p-4 bg-green-100 rounded-full">
-                <FileText className="h-8 w-8 text-green-600" />
               </div>
             </div>
           </CardContent>

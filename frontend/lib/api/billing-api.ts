@@ -133,7 +133,7 @@ class BillingApi {
     if (params?.sortBy) queryParams.append('sortBy', params.sortBy)
     if (params?.sortOrder) queryParams.append('sortOrder', params.sortOrder)
 
-    const response = await apiClient.get<{
+    const response = await apiClient.getRaw<{
       success: boolean
       data: BillingRecord[]
       pagination: any

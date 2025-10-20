@@ -1,13 +1,13 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { formatDateSafe, getVietnameseTimePeriod } from "@/lib/utils"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { toast } from "@/hooks/use-toast"
 import {
   Shield,
@@ -16,22 +16,46 @@ import {
   Settings,
   BarChart3,
   Database,
-  AlertTriangle,
-  CheckCircle,
-  Clock,
   Server,
   HardDrive,
   LogOut,
   User,
   Home,
   FileText,
-  Download,
-  Wrench
+  UserCheck,
+  Calendar,
+  CreditCard,
+  Pill,
+  Bed,
+  Droplets,
+  Truck,
+  Building2,
+  Stethoscope,
+  UserCog,
+  ClipboardList,
 } from "lucide-react"
 import { useAuth } from "@/lib/auth-context"
 import { adminApi, AdminDashboardData, UserData, ActivityLog, SystemStatistics } from "@/lib/api"
 import { useRouter } from "next/navigation"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { Avatar, AvatarFallback } from "@/components/ui/avatar"
+import { 
+  UsersTab,
+  PatientsTab, 
+  DoctorsTab, 
+  StaffTab, 
+  AppointmentsTab, 
+  MedicalRecordsTab, 
+  BillingTab,
+  MedicineTab,
+  PharmacyTab,
+  BloodBankTab,
+  RoomsTab,
+  RoomAssignmentsTab,
+  CleaningTab,
+  AmbulancesTab,
+  ReportsTab,
+  HelpTab
+} from "@/components/admin/tabs"
 
 export default function AdminDashboard() {
   const { user, logout } = useAuth()
@@ -55,32 +79,29 @@ export default function AdminDashboard() {
     }
   }, [user])
 
+  const refreshDashboard = () => {
+    loadDashboardData()
+  }
+
   const loadDashboardData = async () => {
     setLoading(true)
-    console.log('Loading admin dashboard data for user:', user)
     
     try {
       // Load admin dashboard data
       const dashboardResponse = await adminApi.getDashboard()
-      console.log('Admin Dashboard API Response:', dashboardResponse)
       setDashboardData(dashboardResponse)
 
       // Load system statistics
       const statsResponse = await adminApi.getSystemStatistics()
-      console.log('System Statistics API Response:', statsResponse)
       setSystemStats(statsResponse)
 
       // Load users
       const usersResponse = await adminApi.getAllUsers({ limit: 50 })
-      console.log('Users API Response:', usersResponse)
       setUsers(usersResponse.data)
 
       // Load activity logs
       const logsResponse = await adminApi.getActivityLogs({ limit: 20 })
-      console.log('Activity Logs API Response:', logsResponse)
       setActivityLogs(logsResponse.data)
-
-      console.log('Admin dashboard data loaded successfully')
 
     } catch (error) {
       console.error("Error loading admin dashboard data:", error)
@@ -173,6 +194,26 @@ export default function AdminDashboard() {
     return matchesEmail && matchesStatus
   })
 
+  // Define all navigation items
+  const navigationItems = [
+    { value: "overview", label: "Tổng quan", icon: Home },
+    { value: "users", label: "Phân quyền", icon: UserCog },
+    { value: "patients", label: "Bệnh nhân", icon: Users },
+    { value: "doctors", label: "Bác sĩ", icon: Stethoscope },
+    { value: "staff", label: "Nhân viên", icon: UserCheck },
+    { value: "appointments", label: "Lịch hẹn", icon: Calendar },
+    { value: "medical-records", label: "Hồ sơ y tế", icon: FileText },
+    { value: "billing", label: "Thanh toán", icon: CreditCard },
+    { value: "medicine", label: "Thuốc", icon: Pill },
+    { value: "pharmacy", label: "Nhà thuốc", icon: Stethoscope },
+    { value: "blood-bank", label: "Ngân hàng máu", icon: Droplets },
+    { value: "rooms", label: "Phòng bệnh", icon: Building2 },
+    { value: "room-assignments", label: "Phân giường", icon: Bed },
+    { value: "cleaning", label: "Vệ sinh", icon: ClipboardList },
+    { value: "ambulances", label: "Xe cứu thương", icon: Truck },
+    { value: "reports", label: "Báo cáo", icon: BarChart3 },
+  ]
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -185,41 +226,38 @@ export default function AdminDashboard() {
   }
 
   return (
-    <div className="flex h-screen bg-gray-50">
+    <div className="flex h-screen bg-gray-50 overflow-hidden">
       {/* Sidebar */}
-      <div className="w-64 bg-white shadow-lg border-r border-gray-200 flex flex-col">
+      <div className="w-64 bg-white shadow-lg border-r border-gray-200 flex flex-col overflow-y-auto">
         {/* Header */}
-        <div className="p-6 border-b border-gray-200">
+        <div className="p-6 border-b border-gray-200 sticky top-0 bg-white z-10">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-gradient-to-r from-red-500 to-red-600 rounded-lg flex items-center justify-center">
               <Shield className="h-6 w-6 text-white" />
             </div>
             <div>
-              <h1 className="text-lg font-bold text-gray-900">Dashboard Quản trị</h1>
+              <h1 className="text-lg font-bold text-gray-900">Quản Trị Hệ Thống</h1>
               <p className="text-sm text-gray-500">
-                {user?.full_name || user?.email || "Quản trị viên"}
+                {user?.full_name || user?.email || "Admin"}
               </p>
             </div>
           </div>
         </div>
 
         {/* Navigation Menu */}
-        <nav className="flex-1 p-4 space-y-2">
-          {[
-            { value: "overview", label: "Tổng quan", icon: Home },
-            { value: "users", label: "Người dùng", icon: Users, badge: users.length },
-            { value: "system", label: "Hệ thống", icon: Server },
-            { value: "activity", label: "Hoạt động", icon: Activity, badge: activityLogs.length },
-            { value: "backup", label: "Sao lưu", icon: Database },
-            { value: "maintenance", label: "Bảo trì", icon: Wrench },
-          ].map((tab) => {
-            const Icon = tab.icon
-            const isActive = activeTab === tab.value
+        <nav className="flex-1 p-4 space-y-1">
+          <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3 px-3">
+            Chức năng chính
+          </h3>
+          {navigationItems.map((item) => {
+            const Icon = item.icon
+            const isActive = activeTab === item.value
+            const badge = item.value === "appointments" ? dashboardData?.overview.todayAppointments : null
 
             return (
               <button
-                key={tab.value}
-                onClick={() => setActiveTab(tab.value)}
+                key={item.value}
+                onClick={() => setActiveTab(item.value)}
                 className={`
                   w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium text-sm
                   transition-all duration-200 ease-in-out
@@ -231,16 +269,16 @@ export default function AdminDashboard() {
                 `}
               >
                 <Icon className={`h-5 w-5 ${isActive ? "text-white" : ""}`} />
-                <span className="flex-1 text-left">{tab.label}</span>
-                {tab.badge && tab.badge > 0 && (
+                <span className="flex-1 text-left">{item.label}</span>
+                {badge && badge > 0 && (
                   <span
                     className={`
                     min-w-5 h-5 rounded-full text-xs font-bold
-                    flex items-center justify-center
+                    flex items-center justify-center px-2
                     ${isActive ? "bg-white text-red-600" : "bg-blue-500 text-white"}
                   `}
                   >
-                    {tab.badge}
+                    {badge}
                   </span>
                 )}
               </button>
@@ -249,21 +287,17 @@ export default function AdminDashboard() {
         </nav>
 
         {/* User Info & Logout */}
-        <div className="border-t border-gray-200">
+        <div className="border-t border-gray-200 sticky bottom-0 bg-white">
           <div className="p-4 bg-gray-50">
             <div className="flex items-center gap-3">
               <Avatar className="h-8 w-8">
-                <AvatarImage src="/placeholder-user.jpg" alt="Admin Avatar" />
                 <AvatarFallback>
                   <User className="h-4 w-4" />
                 </AvatarFallback>
               </Avatar>
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium text-gray-900 truncate">
-                  {user?.full_name || user?.email || "Quản trị viên"}
-                </p>
-                <p className="text-xs text-gray-500 truncate">
-                  {user?.email || "admin@hospital.vn"}
+                  {user?.full_name || user?.email || "Admin"}
                 </p>
                 <Badge variant="destructive" className="text-xs mt-1">
                   ADMIN
@@ -275,7 +309,7 @@ export default function AdminDashboard() {
           <div className="p-4">
             <button
               onClick={handleLogout}
-              className="w-full flex items-center space-x-3 px-3 py-2 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
+              className="w-full flex items-center space-x-3 px-3 py-2 rounded-lg text-gray-700 hover:bg-gray-100 transition-colors"
             >
               <LogOut className="h-5 w-5" />
               <span>Đăng xuất</span>
@@ -285,32 +319,27 @@ export default function AdminDashboard() {
       </div>
 
       {/* Main Content */}
-      <div className="flex-1 flex flex-col">
+      <div className="flex-1 flex flex-col overflow-hidden">
         {/* Top Bar */}
         <div className="bg-white border-b border-gray-200 px-6 py-4">
           <div className="flex items-center justify-between">
             <div>
               <h2 className="text-xl font-bold text-gray-900">
-                {activeTab === "overview" && "Tổng quan hệ thống"}
-                {activeTab === "users" && "Quản lý người dùng"}
-                {activeTab === "system" && "Thống kê hệ thống"}
-                {activeTab === "activity" && "Nhật ký hoạt động"}
-                {activeTab === "backup" && "Sao lưu dữ liệu"}
-                {activeTab === "maintenance" && "Bảo trì hệ thống"}
+                {navigationItems.find(item => item.value === activeTab)?.label || "Dashboard"}
               </h2>
               <p className="text-sm text-gray-500">
-                Chào buổi {new Date().getHours() < 12 ? "sáng" : new Date().getHours() < 18 ? "chiều" : "tối"}, {" "}
-                {user?.full_name || user?.email || "Quản trị viên"}
+                Chào buổi {getVietnameseTimePeriod(new Date())}, {" "}
+                {user?.full_name || user?.email || "Admin"}
               </p>
             </div>
           </div>
         </div>
 
-        {/* Content Area */}
-        <div className="flex-1 p-6">
-          <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-            {/* Overview Tab */}
-            <TabsContent value="overview" className="space-y-6">
+        {/* Content Area - Scrollable */}
+        <div className="flex-1 p-6 overflow-y-auto">
+          {/* Overview Tab */}
+          {activeTab === "overview" && (
+            <div className="space-y-6">
               {/* KPI Cards */}
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
                 <Card className="bg-gradient-to-br from-blue-50 to-white rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1 border-0">
@@ -370,7 +399,7 @@ export default function AdminDashboard() {
                 </Card>
               </div>
 
-              {/* System Health */}
+              {/* System Health & Recent Activities */}
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 <Card>
                   <CardHeader>
@@ -396,7 +425,7 @@ export default function AdminDashboard() {
                       <span className="text-sm font-medium">Backup cuối</span>
                       <span className="text-sm text-gray-500">
                         {dashboardData?.systemHealth.lastBackup ? 
-                          new Date(dashboardData.systemHealth.lastBackup).toLocaleDateString('vi-VN') : 
+                          formatDateSafe(dashboardData.systemHealth.lastBackup, 'date') : 
                           'Chưa có'
                         }
                       </span>
@@ -420,7 +449,7 @@ export default function AdminDashboard() {
                             <div className="flex-1">
                               <p className="text-sm font-medium">{activity.email}</p>
                               <p className="text-xs text-gray-500">
-                                {new Date(activity.created_at).toLocaleDateString('vi-VN')}
+                                {formatDateSafe(activity.created_at, 'date')}
                               </p>
                             </div>
                           </div>
@@ -432,222 +461,56 @@ export default function AdminDashboard() {
                   </CardContent>
                 </Card>
               </div>
-            </TabsContent>
+            </div>
+          )}
 
-            {/* Users Management Tab */}
-            <TabsContent value="users" className="space-y-6">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Users className="h-5 w-5 text-blue-600" />
-                    Quản lý người dùng ({filteredUsers.length})
-                  </CardTitle>
-                  <div className="flex items-center gap-4">
-                    <Input
-                      placeholder="Tìm kiếm email..."
-                      value={userFilter}
-                      onChange={(e) => setUserFilter(e.target.value)}
-                      className="max-w-sm"
-                    />
-                    <select
-                      value={statusFilter}
-                      onChange={(e) => setStatusFilter(e.target.value)}
-                      className="px-3 py-2 border rounded-md"
-                    >
-                      <option value="">Tất cả trạng thái</option>
-                      <option value="active">Đang hoạt động</option>
-                      <option value="inactive">Đã vô hiệu hóa</option>
-                    </select>
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <div className="overflow-x-auto">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Email</TableHead>
-                          <TableHead>Trạng thái</TableHead>
-                          <TableHead>Ngày tạo</TableHead>
-                          <TableHead>Đăng nhập cuối</TableHead>
-                          <TableHead>Thao tác</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {filteredUsers.map((user) => (
-                          <TableRow key={user.user_id}>
-                            <TableCell className="font-medium">{user.email}</TableCell>
-                            <TableCell>
-                              <Badge variant={user.is_active ? "default" : "secondary"}>
-                                {user.is_active ? "Hoạt động" : "Vô hiệu"}
-                              </Badge>
-                            </TableCell>
-                            <TableCell>
-                              {new Date(user.created_at).toLocaleDateString('vi-VN')}
-                            </TableCell>
-                            <TableCell>
-                              {user.last_login ? 
-                                new Date(user.last_login).toLocaleDateString('vi-VN') : 
-                                'Chưa đăng nhập'
-                              }
-                            </TableCell>
-                            <TableCell>
-                              <Button
-                                size="sm"
-                                variant={user.is_active ? "destructive" : "default"}
-                                onClick={() => handleToggleUserStatus(user.user_id, user.is_active)}
-                              >
-                                {user.is_active ? "Vô hiệu hóa" : "Kích hoạt"}
-                              </Button>
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </div>
-                </CardContent>
-              </Card>
-            </TabsContent>
+          {/* Users/Roles Management Tab (Phân quyền) */}
+          {activeTab === "users" && <UsersTab />}
 
-            {/* System Statistics Tab */}
-            <TabsContent value="system" className="space-y-6">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <BarChart3 className="h-5 w-5 text-purple-600" />
-                    Thống kê hệ thống
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-                    <div className="text-center">
-                      <p className="text-3xl font-bold text-blue-600">{systemStats?.totalUsers || 0}</p>
-                      <p className="text-sm text-gray-600">Người dùng</p>
-                    </div>
-                    <div className="text-center">
-                      <p className="text-3xl font-bold text-green-600">{systemStats?.totalAppointments || 0}</p>
-                      <p className="text-sm text-gray-600">Cuộc hẹn</p>
-                    </div>
-                    <div className="text-center">
-                      <p className="text-3xl font-bold text-purple-600">{systemStats?.totalDepartments || 0}</p>
-                      <p className="text-sm text-gray-600">Khoa</p>
-                    </div>
-                    <div className="text-center">
-                      <p className="text-3xl font-bold text-orange-600">{systemStats?.totalRooms || 0}</p>
-                      <p className="text-sm text-gray-600">Phòng</p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </TabsContent>
+          {/* Patients Tab */}
+          {activeTab === "patients" && <PatientsTab onDataChange={refreshDashboard} />}
 
-            {/* Activity Logs Tab */}
-            <TabsContent value="activity" className="space-y-6">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <FileText className="h-5 w-5 text-green-600" />
-                    Nhật ký hoạt động ({activityLogs.length})
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    {activityLogs && activityLogs.length > 0 ? activityLogs.map((log) => (
-                      <div key={log.log_id} className="p-4 rounded-lg border hover:bg-gray-50 transition-colors">
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <h4 className="font-semibold">{log.action}</h4>
-                            <p className="text-sm text-muted-foreground">
-                              {log.user?.email || 'Hệ thống'} - {log.resource}
-                            </p>
-                            {log.details && (
-                              <p className="text-xs text-gray-500 mt-1">{log.details}</p>
-                            )}
-                          </div>
-                          <div className="text-right">
-                            <p className="text-xs text-gray-500">
-                              {new Date(log.timestamp).toLocaleString('vi-VN')}
-                            </p>
-                          </div>
-                        </div>
-                      </div>
-                    )) : (
-                      <div className="text-center py-12 text-gray-500">
-                        <Activity className="h-16 w-16 mx-auto mb-4 opacity-30" />
-                        <h3 className="text-lg font-medium mb-2">Không có nhật ký hoạt động</h3>
-                        <p>Chưa có hoạt động nào được ghi lại.</p>
-                      </div>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-            </TabsContent>
+          {/* Doctors Tab */}
+          {activeTab === "doctors" && <DoctorsTab onDataChange={refreshDashboard} />}
 
-            {/* Backup Tab */}
-            <TabsContent value="backup" className="space-y-6">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Database className="h-5 w-5 text-blue-600" />
-                    Sao lưu dữ liệu
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="flex items-center gap-4">
-                    <Button onClick={handleCreateBackup} className="bg-blue-600 hover:bg-blue-700">
-                      <Download className="h-4 w-4 mr-2" />
-                      Tạo backup đầy đủ
-                    </Button>
-                    <p className="text-sm text-gray-600">
-                      Backup cuối: {dashboardData?.systemHealth.lastBackup ? 
-                        new Date(dashboardData.systemHealth.lastBackup).toLocaleString('vi-VN') : 
-                        'Chưa có'
-                      }
-                    </p>
-                  </div>
-                  <div className="p-4 bg-blue-50 rounded-lg">
-                    <p className="text-sm text-blue-800">
-                      <strong>Lưu ý:</strong> Quá trình backup có thể mất vài phút. Hệ thống sẽ tiếp tục hoạt động bình thường.
-                    </p>
-                  </div>
-                </CardContent>
-              </Card>
-            </TabsContent>
+          {/* Staff Tab */}
+          {activeTab === "staff" && <StaffTab onDataChange={refreshDashboard} />}
 
-            {/* Maintenance Tab */}
-            <TabsContent value="maintenance" className="space-y-6">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Wrench className="h-5 w-5 text-orange-600" />
-                    Bảo trì hệ thống
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="flex items-center gap-4">
-                    <Button 
-                      onClick={() => handleToggleMaintenanceMode(true)}
-                      variant="destructive"
-                    >
-                      <AlertTriangle className="h-4 w-4 mr-2" />
-                      Bật chế độ bảo trì
-                    </Button>
-                    <Button 
-                      onClick={() => handleToggleMaintenanceMode(false)}
-                      className="bg-green-600 hover:bg-green-700"
-                    >
-                      <CheckCircle className="h-4 w-4 mr-2" />
-                      Tắt chế độ bảo trì
-                    </Button>
-                  </div>
-                  <div className="p-4 bg-orange-50 rounded-lg">
-                    <p className="text-sm text-orange-800">
-                      <strong>Cảnh báo:</strong> Khi bật chế độ bảo trì, người dùng sẽ không thể truy cập hệ thống.
-                    </p>
-                  </div>
-                </CardContent>
-              </Card>
-            </TabsContent>
-          </Tabs>
+          {/* Appointments Tab */}
+          {activeTab === "appointments" && <AppointmentsTab />}
+
+          {/* Medical Records Tab */}
+          {activeTab === "medical-records" && <MedicalRecordsTab />}
+
+          {/* Billing Tab */}
+          {activeTab === "billing" && <BillingTab />}
+
+          {/* Medicine Tab */}
+          {activeTab === "medicine" && <MedicineTab />}
+
+          {/* Pharmacy Tab */}
+          {activeTab === "pharmacy" && <PharmacyTab />}
+
+          {/* Blood Bank Tab */}
+          {activeTab === "blood-bank" && <BloodBankTab />}
+
+          {/* Rooms Tab */}
+          {activeTab === "rooms" && <RoomsTab />}
+
+          {/* Room Assignments Tab */}
+          {activeTab === "room-assignments" && <RoomAssignmentsTab />}
+
+          {/* Cleaning Tab */}
+          {activeTab === "cleaning" && <CleaningTab />}
+
+          {/* Ambulances Tab */}
+          {activeTab === "ambulances" && <AmbulancesTab />}
+
+          {/* Reports Tab */}
+          {activeTab === "reports" && <ReportsTab />}
+
+          {/* Help Tab */}
+          {activeTab === "help" && <HelpTab />}
         </div>
       </div>
     </div>

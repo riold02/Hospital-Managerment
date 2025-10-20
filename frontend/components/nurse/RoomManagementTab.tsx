@@ -46,14 +46,14 @@ export default function RoomManagementTab({
   const [dischargingAssignmentId, setDischargingAssignmentId] = useState<number | null>(null)
 
   // Filter rooms
-  const filteredRooms = rooms.filter(room => {
+  const filteredRooms = (rooms || []).filter(room => {
     const matchesSearch = room.room_number.toLowerCase().includes(searchTerm.toLowerCase())
     const matchesStatus = statusFilter === 'all' || room.status.toLowerCase() === statusFilter.toLowerCase()
     return matchesSearch && matchesStatus
   })
 
   const getRoomAssignments = (roomId: number) => {
-    return roomAssignments.filter(
+    return (roomAssignments || []).filter(
       assignment => assignment.room_id === roomId && !assignment.end_date
     )
   }
@@ -166,7 +166,7 @@ export default function RoomManagementTab({
 
             <div className="flex items-end">
               <p className="text-sm text-muted-foreground">
-                Hiển thị <span className="font-semibold text-primary">{filteredRooms.length}</span> / <span className="font-semibold">{rooms.length}</span> phòng
+                Hiển thị <span className="font-semibold text-primary">{filteredRooms.length}</span> / <span className="font-semibold">{rooms?.length || 0}</span> phòng
               </p>
             </div>
           </div>
@@ -482,7 +482,7 @@ function AssignPatientModal({
                 <SelectValue placeholder="Chọn bệnh nhân" />
               </SelectTrigger>
               <SelectContent>
-                {patients.map((patient) => (
+                {(patients || []).map((patient) => (
                   <SelectItem key={patient.patient_id} value={patient.patient_id.toString()}>
                     {patient.first_name} {patient.last_name} - {patient.email}
                   </SelectItem>

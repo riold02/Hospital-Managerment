@@ -197,12 +197,36 @@ const getNurseDashboard = async (req, res) => {
 // Get patients assigned to nurse
 const getAssignedPatients = async (req, res) => {
   try {
-    const nurseId = req.user.user_id;
+    const userId = req.user.user_id;
+    console.log('🔍 getAssignedPatients - userId:', userId);
     
-    const patients = await prisma.room_assignments.findMany({
+    // First get the nurse staff record for this user
+    const nurse = await prisma.staff.findFirst({
       where: {
-        end_date: null,
-        assignment_type: 'Patient'
+        user_id: userId,
+        role: 'nurse'
+      }
+    });
+
+    console.log('🔍 Found nurse:', nurse);
+
+    if (!nurse) {
+      console.log('❌ Nurse profile not found for userId:', userId);
+      return res.status(404).json({
+        success: false,
+        error: 'Nurse profile not found'
+      });
+    }
+
+    // Get nurse-patient assignments
+    const assignments = await prisma.nurse_patient_assignments.findMany({
+      where: {
+        nurse_id: nurse.staff_id,
+        status: 'active',
+        OR: [
+          { end_date: null },
+          { end_date: { gte: new Date() } }
+        ]
       },
       include: {
         patient: {
@@ -210,23 +234,46 @@ const getAssignedPatients = async (req, res) => {
             medical_records: {
               orderBy: { created_at: 'desc' },
               take: 1
+            },
+            room_assignments: {
+              where: {
+                end_date: null
+              },
+              include: {
+                room: {
+                  select: {
+                    room_id: true,
+                    room_number: true,
+                    capacity: true,
+                    status: true
+                  }
+                }
+              }
             }
-          }
-        },
-        room: {
-          select: {
-            room_id: true,
-            room_number: true,
-            capacity: true,
-            status: true
           }
         }
       }
     });
 
+    console.log('🔍 Found assignments:', assignments.length);
+
+    // Transform data to match frontend expectations
+    const transformedData = assignments.map(assignment => ({
+      assignment_id: assignment.assignment_id,
+      room_id: assignment.patient.room_assignments[0]?.room_id || null,
+      patient_id: assignment.patient.patient_id,
+      assignment_type: 'PATIENT',
+      start_date: assignment.start_date,
+      end_date: assignment.end_date,
+      patient: assignment.patient,
+      room: assignment.patient.room_assignments[0]?.room || null
+    }));
+
+    console.log('🔍 Transformed data:', transformedData.length);
+
     res.json({
       success: true,
-      data: patients
+      data: transformedData
     });
   } catch (error) {
     console.error('Error fetching assigned patients:', error);
@@ -282,11 +329,14 @@ const getMedicationSchedule = async (req, res) => {
     const { date } = req.query;
     const targetDate = date ? new Date(date) : new Date();
     
+    // Get prescriptions from last 7 days instead of just today
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+    
     const medications = await prisma.prescriptions.findMany({
       where: {
         created_at: {
-          gte: new Date(targetDate.setHours(0, 0, 0, 0)),
-          lt: new Date(targetDate.setHours(23, 59, 59, 999))
+          gte: sevenDaysAgo
         }
       },
       include: {

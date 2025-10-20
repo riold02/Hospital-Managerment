@@ -9,6 +9,7 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { StatusBadge } from "@/components/shared/StatusBadge";
 import { Separator } from "@/components/ui/separator";
 import {
   Receipt,
@@ -41,43 +42,7 @@ const formatCurrency = (amount: number | string) => {
   }).format(num);
 };
 
-const getStatusBadge = (status: string) => {
-  // Support both UPPERCASE and PascalCase
-  const upperStatus = status.toUpperCase();
-  
-  switch (upperStatus) {
-    case "PAID":
-      return (
-        <Badge className="bg-green-500 hover:bg-green-600">
-          <CheckCircle className="w-3 h-3 mr-1" />
-          Đã thanh toán
-        </Badge>
-      );
-    case "PENDING":
-      return (
-        <Badge className="bg-yellow-500 hover:bg-yellow-600">
-          <Clock className="w-3 h-3 mr-1" />
-          Đang chờ
-        </Badge>
-      );
-    case "OVERDUE":
-      return (
-        <Badge className="bg-orange-500 hover:bg-orange-600">
-          <XCircle className="w-3 h-3 mr-1" />
-          Quá hạn
-        </Badge>
-      );
-    case "CANCELLED":
-      return (
-        <Badge className="bg-red-500 hover:bg-red-600">
-          <XCircle className="w-3 h-3 mr-1" />
-          Đã hủy
-        </Badge>
-      );
-    default:
-      return <Badge variant="outline">{status}</Badge>;
-  }
-};
+// Removed getStatusBadge function - now using StatusBadge component
 
 const getPaymentMethodLabel = (method: string) => {
   switch (method) {
@@ -316,7 +281,7 @@ export function BillDetailModal({
                     <Calendar className="w-5 h-5" />
                     Thông tin hóa đơn
                   </h3>
-                  {getStatusBadge(billing.payment_status)}
+                  <StatusBadge status={billing.payment_status} type="billing" />
                 </div>
                 <div className="grid grid-cols-2 gap-3 text-sm">
                   <div>

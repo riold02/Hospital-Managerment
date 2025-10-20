@@ -78,25 +78,58 @@ class ApiClient {
 
   // Generic CRUD operations
   async get<T>(endpoint: string): Promise<T> {
-    return this.request<T>(endpoint, { method: "GET" })
+    const response = await this.request<any>(endpoint, { method: "GET" })
+    
+    // If response has data property, unwrap it (backend format: { success: true, data: [...] })
+    if (response && typeof response === 'object' && 'data' in response) {
+      return response.data as T
+    }
+    
+    return response as T
+  }
+
+  // Get without unwrapping (for APIs that need full response)
+  async getRaw<T>(endpoint: string): Promise<T> {
+    return await this.request<T>(endpoint, { method: "GET" })
   }
 
   async post<T>(endpoint: string, data: any): Promise<T> {
-    return this.request<T>(endpoint, {
+    const response = await this.request<any>(endpoint, {
       method: "POST",
       body: JSON.stringify(data),
     })
+    
+    // If response has data property, unwrap it
+    if (response && typeof response === 'object' && 'data' in response) {
+      return response.data as T
+    }
+    
+    return response as T
   }
 
   async put<T>(endpoint: string, data: any): Promise<T> {
-    return this.request<T>(endpoint, {
+    const response = await this.request<any>(endpoint, {
       method: "PUT",
       body: JSON.stringify(data),
     })
+    
+    // If response has data property, unwrap it
+    if (response && typeof response === 'object' && 'data' in response) {
+      return response.data as T
+    }
+    
+    return response as T
   }
 
   async delete<T>(endpoint: string): Promise<T> {
-    return this.request<T>(endpoint, { method: "DELETE" })
+    const response = await this.request<any>(endpoint, { method: "DELETE" })
+    
+    // If response has data property, unwrap it
+    if (response && typeof response === 'object' && 'data' in response) {
+      return response.data as T
+    }
+    
+    return response as T
   }
 
   async patch<T>(endpoint: string, data?: any): Promise<T> {
@@ -154,19 +187,19 @@ class ApiClient {
   // Appointments
   async getAppointments(date?: string): Promise<any[]> {
     const params = date ? `?date=${date}` : ""
-    const response = await this.get<{success: boolean, data: any[]}>(`/appointments${params}`)
-    return response.data || []
+    const response = await this.get<any[]>(`/appointments${params}`)
+    return response || []
   }
 
   async getPatientAppointments(patientId?: string): Promise<any[]> {
     const endpoint = patientId ? `/appointments/patient/${patientId}` : "/appointments/patient/me"
-    const response = await this.get<{success: boolean, data: any[]}>(endpoint)
-    return response.data || []
+    const response = await this.get<any[]>(endpoint)
+    return response || []
   }
 
   async createAppointment(data: any): Promise<any> {
-    const response = await this.post<{success: boolean, data: any, message?: string}>("/appointments", data)
-    return response.data
+    const response = await this.post<any>("/appointments", data)
+    return response
   }
 
   async updateAppointment(id: string, data: any): Promise<any> {
@@ -179,6 +212,10 @@ class ApiClient {
 
   async cancelAppointment(id: string): Promise<any> {
     return this.patch(`/appointments/${id}/cancel`)
+  }
+
+  async checkAppointmentAvailability(doctor_id: number, appointment_date: string, appointment_time: string): Promise<any> {
+    return this.get(`/appointments/check-availability?doctor_id=${doctor_id}&appointment_date=${appointment_date}&appointment_time=${appointment_time}`)
   }
 
   // Billing
@@ -239,13 +276,13 @@ class ApiClient {
     if (department_id) params.append('department_id', department_id)
     const queryString = params.toString()
     
-    const response = await this.get<{success: boolean, data: any[]}>(`/doctors${queryString ? '?' + queryString : ''}`)
-    return response.data || []
+    const response = await this.get<any[]>(`/doctors${queryString ? '?' + queryString : ''}`)
+    return response || []
   }
 
   async getDepartments(): Promise<any[]> {
-    const response = await this.get<{success: boolean, data: any[]}>("/departments")
-    return response.data || []
+    const response = await this.get<any[]>("/departments")
+    return response || []
   }
 
   async getNurses(): Promise<any[]> {
@@ -293,12 +330,12 @@ class ApiClient {
     token: string
     user: any
   }> {
-    const response = await this.post<{ data: { token: string; user: any } }>("/auth/login", {
+    const response = await this.post<{ token: string; user: any }>("/auth/login", {
       email,
       password,
     })
-    this.setToken(response.data.token)
-    return response.data
+    this.setToken(response.token)
+    return response
   }
 
   async registerPatient(
@@ -314,7 +351,7 @@ class ApiClient {
     token: string
     user: any
   }> {
-    const response = await this.post<{ data: { token: string; user: any } }>("/auth/register/patient", {
+    const response = await this.post<{ token: string; user: any }>("/auth/register/patient", {
       first_name,
       last_name,
       email,
@@ -324,8 +361,8 @@ class ApiClient {
       contact_number,
       address,
     })
-    this.setToken(response.data.token)
-    return response.data
+    this.setToken(response.token)
+    return response
   }
 
   async logout(): Promise<void> {

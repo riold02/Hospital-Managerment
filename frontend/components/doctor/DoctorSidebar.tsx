@@ -72,7 +72,7 @@ export default function DoctorSidebar({
       value: "inpatient",
       label: "Nội trú",
       icon: Bed,
-      badge: kpiData.inpatients,
+      badge: null,
     },
     {
       value: "medical-records",
@@ -84,7 +84,7 @@ export default function DoctorSidebar({
       value: "results",
       label: "Kết quả xét nghiệm",
       icon: FlaskConical,
-      badge: kpiData.pendingResults,
+      badge: null,
     },
     {
       value: "doctors",

@@ -172,17 +172,17 @@ export default function DoctorDashboard() {
   // KPI Data with defaults
   // Calculate real KPI data from states
   const kpiData = {
-    appointmentsToday: dashboardData?.todayAppointments || appointments.filter((apt: AppointmentData) => {
+    appointmentsToday: dashboardData?.todayAppointments || (appointments || []).filter((apt: AppointmentData) => {
       const today = new Date().toISOString().split('T')[0];
       const appointmentDate = apt.appointment_date.split('T')[0];
       // Chỉ hiển thị lịch hẹn đã xác nhận của hôm nay
       return appointmentDate === today && (apt.status === "Confirmed" || apt.status === "Đã xác nhận");
     }).length,
-    completedToday: appointments.filter((apt: AppointmentData) => apt.status === "Completed" || apt.status === "Hoàn thành").length,
-    pendingResults: pendingResults.length,
+    completedToday: (appointments || []).filter((apt: AppointmentData) => apt.status === "Completed" || apt.status === "Hoàn thành").length,
+    pendingResults: (pendingResults || []).length,
     criticalAlerts: criticalAlerts,
-    inpatients: inpatients.length,
-    newMessages: messages.filter((msg: any) => !msg.read).length
+    inpatients: (inpatients || []).length,
+    newMessages: (messages || []).filter((msg: any) => !msg.read).length
   }
 
   // Helper Functions
@@ -216,6 +216,8 @@ export default function DoctorDashboard() {
   }
 
   const filterAppointments = (appointments: AppointmentData[]) => {
+    if (!appointments || !Array.isArray(appointments)) return [];
+    
     const now = new Date();
     now.setHours(0, 0, 0, 0);
     return appointments.filter((apt: AppointmentData) => {

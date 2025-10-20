@@ -23,7 +23,7 @@ export default function DoctorsTab({ allDoctors }: DoctorsTabProps) {
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Stethoscope className="h-5 w-5 text-green-600" />
-          Danh sách bác sĩ ({allDoctors.length})
+          Danh sách bác sĩ ({(allDoctors || []).length})
         </CardTitle>
         <CardDescription>Danh sách các bác sĩ trong hệ thống</CardDescription>
       </CardHeader>

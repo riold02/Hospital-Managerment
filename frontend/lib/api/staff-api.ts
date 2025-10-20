@@ -46,20 +46,20 @@ export const staffApi = {
     if (params?.search) queryParams.append('search', params.search);
 
     const endpoint = queryParams.toString() ? `/staff?${queryParams}` : '/staff';
-    const response = await apiClient.get<{ success: boolean; data: StaffMember[]; pagination?: any }>(endpoint);
+    const response = await apiClient.getRaw<{ success: boolean; data: StaffMember[]; pagination?: any }>(endpoint);
     // Backend returns {success, data, pagination}
     return response;
   },
 
   // Get staff by ID
   async getStaffById(id: number) {
-    const response = await apiClient.get<{ success: boolean; data: StaffMember }>(`/staff/${id}`);
+    const response = await apiClient.getRaw<{ success: boolean; data: StaffMember }>(`/staff/${id}`);
     return response.data;
   },
 
   // Get staff statistics
   async getStaffStats() {
-    const response = await apiClient.get<{ success: boolean; data: StaffStats }>('/staff/stats');
+    const response = await apiClient.getRaw<{ success: boolean; data: StaffStats }>('/staff/stats');
     return response.data;
   },
 

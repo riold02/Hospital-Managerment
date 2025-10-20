@@ -42,11 +42,12 @@ class PharmacyController {
         // Total medicines in inventory
         prisma.medicine.count(),
         
-        // Medicines expiring in next 30 days
+        // Medicines expiring in next 30 days (chưa hết hạn nhưng sắp hết hạn)
         prisma.medicine.count({
           where: {
             expiry_date: {
-              lte: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
+              gte: new Date(), // Chưa hết hạn
+              lte: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) // Sẽ hết hạn trong 30 ngày
             }
           }
         }),
@@ -272,16 +273,18 @@ class PharmacyController {
     }
   }
 
-  // Get expiring medicines
+  // Get expiring medicines (thuốc sắp hết hạn trong vòng X ngày)
   async getExpiringMedicines(req, res) {
     try {
       const { days = 30 } = req.query;
+      const now = new Date();
       const expiryDate = new Date(Date.now() + parseInt(days) * 24 * 60 * 60 * 1000);
 
       const medicines = await prisma.medicine.findMany({
         where: {
           expiry_date: {
-            lte: expiryDate
+            gte: now, // Chưa hết hạn (còn hạn từ hôm nay trở đi)
+            lte: expiryDate // Sẽ hết hạn trong vòng X ngày
           },
           stock_quantity: {
             gt: 0

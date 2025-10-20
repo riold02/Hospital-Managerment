@@ -1,5 +1,6 @@
 const { prisma } = require('../config/prisma');
 const { validationResult } = require('express-validator');
+const bcrypt = require('bcryptjs');
 
 class DoctorController {
   // Create doctor
@@ -14,29 +15,71 @@ class DoctorController {
         });
       }
 
-      const doctorData = {
-        first_name: req.body.first_name,
-        last_name: req.body.last_name,
-        specialty: req.body.specialty,
-        contact_number: req.body.contact_number ?? null,
-        email: req.body.email ?? null,
-        available_schedule: req.body.available_schedule ?? null
-      };
+      const { first_name, last_name, specialty, phone, email, password, available_schedule } = req.body;
 
       // Check if email already exists
-      if (doctorData.email) {
-        const existingDoctor = await prisma.doctors.findFirst({ where: { email: doctorData.email } });
-        if (existingDoctor) {
-          return res.status(409).json({ success: false, error: 'Doctor with this email already exists' });
+      if (email) {
+        const existingUser = await prisma.users.findFirst({ where: { email } });
+        if (existingUser) {
+          return res.status(409).json({ success: false, error: 'Email already exists' });
         }
       }
+
+      // Hash password if provided
+      let hashedPassword = null;
+      if (password) {
+        hashedPassword = await bcrypt.hash(password, 10);
+      }
+
+      // Create user account first if email and password provided
+      let userId = null;
+      if (email && hashedPassword) {
+        // Find doctor role_id
+        const doctorRole = await prisma.roles.findUnique({
+          where: { role_name: 'doctor' }
+        });
+        
+        if (!doctorRole) {
+          return res.status(500).json({ success: false, error: 'Doctor role not found in system' });
+        }
+
+        // Create user
+        const user = await prisma.users.create({
+          data: {
+            email,
+            password_hash: hashedPassword,
+            is_active: true
+          }
+        });
+        userId = user.user_id;
+
+        // Assign doctor role to user
+        await prisma.user_roles.create({
+          data: {
+            user_id: userId,
+            role_id: doctorRole.role_id,
+            is_active: true
+          }
+        });
+      }
+
+      // Create doctor record
+      const doctorData = {
+        user_id: userId,
+        first_name,
+        last_name,
+        specialty,
+        phone: phone ?? null,
+        email: email ?? null,
+        available_schedule: available_schedule ?? null
+      };
 
       const data = await prisma.doctors.create({ data: doctorData });
 
       res.status(201).json({
         success: true,
         data,
-        message: 'Doctor created successfully'
+        message: 'Doctor and user account created successfully'
       });
     } catch (error) {
       console.error('Create doctor error:', error);
@@ -181,13 +224,66 @@ class DoctorController {
     }
   }
 
-  // Delete doctor (soft delete)
+  // Delete doctor (hard delete)
   async deleteDoctor(req, res) {
     try {
       const { id } = req.params;
 
-      await prisma.doctors.delete({ where: { doctor_id: Number(id) } });
-      res.json({ success: true, message: 'Doctor deleted successfully' });
+      // Use transaction to ensure all operations succeed or fail together
+      const result = await prisma.$transaction(async (tx) => {
+        // First, get the doctor to find the associated user_id
+        const doctor = await tx.doctors.findUnique({
+          where: { doctor_id: Number(id) },
+          select: { user_id: true }
+        });
+
+        if (!doctor) {
+          throw new Error('Doctor not found');
+        }
+
+        console.log('Deleting doctor with user_id:', doctor.user_id);
+
+        // Delete related records first to avoid foreign key constraints
+        // Delete appointments
+        await tx.appointments.deleteMany({
+          where: { doctor_id: Number(id) }
+        });
+        console.log('Appointments deleted');
+
+        // Delete medical records
+        await tx.medical_records.deleteMany({
+          where: { doctor_id: Number(id) }
+        });
+        console.log('Medical records deleted');
+
+        // Delete prescriptions
+        await tx.prescriptions.deleteMany({
+          where: { prescribed_by_user_id: doctor.user_id }
+        });
+        console.log('Prescriptions deleted');
+
+        // Delete doctor record
+        await tx.doctors.delete({ where: { doctor_id: Number(id) } });
+        console.log('Doctor record deleted');
+
+        // Delete user roles
+        if (doctor.user_id) {
+          await tx.user_roles.deleteMany({
+            where: { user_id: doctor.user_id }
+          });
+          console.log('User roles deleted');
+
+          // Delete user account
+          await tx.users.delete({
+            where: { user_id: doctor.user_id }
+          });
+          console.log('User account deleted');
+        }
+
+        return { success: true, message: 'Doctor and user account deleted successfully' };
+      });
+
+      res.json(result);
     } catch (error) {
       console.error('Delete doctor error:', error);
       res.status(400).json({

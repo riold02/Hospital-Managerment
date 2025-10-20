@@ -51,3 +51,68 @@ export function formatAppointmentTime(timeValue: string | Date | null | undefine
   
   return '--:--';
 }
+
+/**
+ * Format date consistently for SSR/CSR to avoid hydration mismatch
+ * Uses UTC methods to ensure same output on server and client
+ * @param dateValue - Date string or Date object
+ * @param format - Format type: 'date', 'datetime', 'time'
+ * @returns Formatted date string
+ */
+export function formatDateSafe(dateValue: string | Date | null | undefined, format: 'date' | 'datetime' | 'time' = 'date'): string {
+  if (!dateValue) return 'N/A';
+  
+  let date: Date;
+  if (typeof dateValue === 'string') {
+    date = new Date(dateValue);
+  } else {
+    date = dateValue;
+  }
+  
+  if (isNaN(date.getTime())) return 'N/A';
+  
+  // Use UTC methods to ensure consistent output
+  const year = date.getUTCFullYear();
+  const month = (date.getUTCMonth() + 1).toString().padStart(2, '0');
+  const day = date.getUTCDate().toString().padStart(2, '0');
+  const hours = date.getUTCHours().toString().padStart(2, '0');
+  const minutes = date.getUTCMinutes().toString().padStart(2, '0');
+  const seconds = date.getUTCSeconds().toString().padStart(2, '0');
+  
+  switch (format) {
+    case 'date':
+      return `${day}/${month}/${year}`;
+    case 'datetime':
+      return `${day}/${month}/${year} ${hours}:${minutes}`;
+    case 'time':
+      return `${hours}:${minutes}`;
+    default:
+      return `${day}/${month}/${year}`;
+  }
+}
+
+/**
+ * Get Vietnamese time period (sáng, chiều, tối) consistently
+ * Uses UTC hours to avoid hydration mismatch
+ * @param dateValue - Date string or Date object
+ * @returns Vietnamese time period
+ */
+export function getVietnameseTimePeriod(dateValue: string | Date | null | undefined): string {
+  if (!dateValue) return 'N/A';
+  
+  let date: Date;
+  if (typeof dateValue === 'string') {
+    date = new Date(dateValue);
+  } else {
+    date = dateValue;
+  }
+  
+  if (isNaN(date.getTime())) return 'N/A';
+  
+  // Use UTC hours to ensure consistent output
+  const hours = date.getUTCHours();
+  
+  if (hours >= 5 && hours < 12) return 'sáng';
+  if (hours >= 12 && hours < 18) return 'chiều';
+  return 'tối';
+}

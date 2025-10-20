@@ -53,7 +53,7 @@ export const appointmentsApi = {
     const queryString = queryParams.toString();
     const endpoint = queryString ? `/appointments?${queryString}` : '/appointments';
     
-    const response = await apiClient.get<{
+    const response = await apiClient.getRaw<{
       success: boolean;
       data: Appointment[];
       pagination: any;

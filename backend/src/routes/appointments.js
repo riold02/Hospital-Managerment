@@ -204,6 +204,38 @@ router.get('/doctor/:doctor_id', authenticateToken, appointmentController.getDoc
 
 /**
  * @swagger
+ * /api/v1/appointments/check-availability:
+ *   get:
+ *     summary: Check if a time slot is available for booking
+ *     tags: [Appointments]
+ *     parameters:
+ *       - in: query
+ *         name: doctor_id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: Doctor ID
+ *       - in: query
+ *         name: appointment_date
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: date
+ *         description: Appointment date (YYYY-MM-DD)
+ *       - in: query
+ *         name: appointment_time
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Appointment time (HH:MM)
+ *     responses:
+ *       200:
+ *         description: Availability status
+ */
+router.get('/check-availability', appointmentController.checkAvailability);
+
+/**
+ * @swagger
  * /api/v1/appointments/patient/me:
  *   get:
  *     summary: Get current patient's appointments

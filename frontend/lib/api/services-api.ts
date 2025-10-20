@@ -45,7 +45,7 @@ class ServicesApi {
    * Get all services
    */
   async getAllServices(params?: GetServicesParams) {
-    const response = await apiClient.get<{ success: boolean; data: Service[]; total: number }>(
+    const response = await apiClient.getRaw<{ success: boolean; data: Service[]; total: number }>(
       '/services',
       { params }
     );
@@ -56,7 +56,7 @@ class ServicesApi {
    * Get service by ID
    */
   async getServiceById(id: number) {
-    const response = await apiClient.get<{ success: boolean; data: Service }>(
+    const response = await apiClient.getRaw<{ success: boolean; data: Service }>(
       `/services/${id}`
     );
     return response.data;
@@ -66,7 +66,7 @@ class ServicesApi {
    * Get services by category
    */
   async getServicesByCategory(category: string) {
-    const response = await apiClient.get<{ success: boolean; data: Service[]; total: number }>(
+    const response = await apiClient.getRaw<{ success: boolean; data: Service[]; total: number }>(
       `/services/category/${category}`
     );
     return response.data;
@@ -76,7 +76,7 @@ class ServicesApi {
    * Get all service categories
    */
   async getServiceCategories() {
-    const response = await apiClient.get<{ success: boolean; data: ServiceCategory[] }>(
+    const response = await apiClient.getRaw<{ success: boolean; data: ServiceCategory[] }>(
       '/services/categories'
     );
     return response.data;

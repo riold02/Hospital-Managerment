@@ -63,7 +63,14 @@ class RoomController {
       const [data, count] = await Promise.all([
         prisma.rooms.findMany({
           where,
-          include: { room_type: true },
+          include: { 
+            room_type: true,
+            room_assignments: {
+              where: {
+                end_date: null
+              }
+            }
+          },
           orderBy: { [sortBy]: sortOrder === 'asc' ? 'asc' : 'desc' },
           skip: Number(offset),
           take: Number(limit)
@@ -71,9 +78,16 @@ class RoomController {
         prisma.rooms.count({ where })
       ]);
 
+      // Calculate current occupancy and availability for each room
+      const roomsWithOccupancy = data.map(room => ({
+        ...room,
+        current_occupancy: room.room_assignments.length,
+        is_available: room.status === 'Available' && room.room_assignments.length < room.capacity
+      }));
+
       res.json({
         success: true,
-        data,
+        data: roomsWithOccupancy,
         pagination: {
           page: parseInt(page),
           limit: parseInt(limit),

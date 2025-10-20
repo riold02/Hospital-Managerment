@@ -56,7 +56,7 @@ class MedicineApi {
     if (params?.sortBy) queryParams.append('sortBy', params.sortBy)
     if (params?.sortOrder) queryParams.append('sortOrder', params.sortOrder)
 
-    const response = await apiClient.get<{
+    const response = await apiClient.getRaw<{
       success: boolean
       data: Medicine[]
       pagination: any
@@ -70,7 +70,7 @@ class MedicineApi {
 
   // Get medicine by ID
   async getMedicineById(id: number): Promise<Medicine> {
-    const response = await apiClient.get<{
+    const response = await apiClient.getRaw<{
       success: boolean
       data: Medicine
     }>(`/medicine/${id}`)
@@ -104,7 +104,7 @@ class MedicineApi {
 
   // Get medicines by type
   async getMedicinesByType(type: string): Promise<Medicine[]> {
-    const response = await apiClient.get<{
+    const response = await apiClient.getRaw<{
       success: boolean
       data: Medicine[]
     }>(`/medicine/type/${type}`)
@@ -116,7 +116,7 @@ class MedicineApi {
     const queryParams = new URLSearchParams()
     if (threshold) queryParams.append('threshold', threshold.toString())
 
-    const response = await apiClient.get<{
+    const response = await apiClient.getRaw<{
       success: boolean
       data: Medicine[]
     }>(`/medicine/low-stock?${queryParams}`)
@@ -125,7 +125,7 @@ class MedicineApi {
 
   // Get expired medicines
   async getExpiredMedicines(): Promise<Medicine[]> {
-    const response = await apiClient.get<{
+    const response = await apiClient.getRaw<{
       success: boolean
       data: Medicine[]
     }>('/medicine/expired')
@@ -141,7 +141,7 @@ class MedicineApi {
     expired: number
     expiringSoon: number
   }> {
-    const response = await apiClient.get<{
+    const response = await apiClient.getRaw<{
       success: boolean
       data: {
         total: number

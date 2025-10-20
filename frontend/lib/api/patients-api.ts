@@ -109,12 +109,12 @@ export const patientsApi = {
     const queryString = queryParams.toString()
     const endpoint = queryString ? `/patients?${queryString}` : '/patients'
     
-    return await apiClient.get<PatientsResponse>(endpoint)
+    return await apiClient.getRaw<PatientsResponse>(endpoint)
   },
 
   // Get patient by ID
   getPatientById: async (id: number): Promise<{ success: boolean; data: Patient }> => {
-    return await apiClient.get<{ success: boolean; data: Patient }>(`/patients/${id}`)
+    return await apiClient.getRaw<{ success: boolean; data: Patient }>(`/patients/${id}`)
   },
 
   // Get patient statistics
@@ -127,12 +127,12 @@ export const patientsApi = {
       other: number
     }
   }> => {
-    return await apiClient.get('/patients/stats')
+    return await apiClient.getRaw('/patients/stats')
   },
 
   // Get assigned patients for nurse
   getAssignedPatients: async (): Promise<{ success: boolean; data: AssignedPatient[] }> => {
-    return await apiClient.get<{ success: boolean; data: AssignedPatient[] }>('/nurse/patient-assignments')
+    return await apiClient.getRaw<{ success: boolean; data: AssignedPatient[] }>('/nurse/patient-assignments')
   },
 
   // Record vital signs
@@ -150,5 +150,45 @@ export const patientsApi = {
     data: MedicalRecord[];
   }> => {
     return await apiClient.get(`/medical-records/patient/${patientId}`)
+  },
+
+  // Create patient
+  createPatient: async (data: {
+    first_name: string
+    last_name: string
+    date_of_birth?: string
+    gender?: string
+    phone?: string
+    email?: string
+    password?: string
+    address?: string
+    blood_type?: string
+    emergency_contact_name?: string
+    emergency_contact_phone?: string
+    medical_history?: string
+  }): Promise<{ success: boolean; data: Patient; message: string }> => {
+    return await apiClient.post('/patients', data)
+  },
+
+  // Update patient
+  updatePatient: async (patientId: number, data: {
+    first_name?: string
+    last_name?: string
+    date_of_birth?: string
+    gender?: string
+    phone?: string
+    email?: string
+    address?: string
+    blood_type?: string
+    emergency_contact_name?: string
+    emergency_contact_phone?: string
+    medical_history?: string
+  }): Promise<{ success: boolean; data: Patient; message: string }> => {
+    return await apiClient.put(`/patients/${patientId}`, data)
+  },
+
+  // Delete patient
+  deletePatient: async (patientId: number): Promise<{ success: boolean; message: string }> => {
+    return await apiClient.delete(`/patients/${patientId}`)
   }
 }

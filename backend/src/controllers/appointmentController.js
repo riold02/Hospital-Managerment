@@ -24,14 +24,21 @@ class AppointmentController {
         });
       }
       
-      // Chuyển đổi time string (HH:MM) - Prisma sẽ tự động handle TIME type
+      // Convert time string (HH:MM) to DateTime for Prisma
+      // Prisma DateTime with @db.Time needs a full date+time, but only time part is stored
       const timeString = req.body.appointment_time; // "17:00"
+      const timeWithSeconds = timeString.includes(':') && timeString.split(':').length === 2 
+        ? `${timeString}:00` 
+        : timeString; // Ensure HH:MM:SS format
+      
+      // Create a dummy date with the time - PostgreSQL will only store the time part
+      const dummyDate = new Date(`1970-01-01T${timeWithSeconds}Z`);
       
       const appointmentData = {
         patient_id: Number(patient_id),
         doctor_id: req.body.doctor_id ? Number(req.body.doctor_id) : null,
         appointment_date: new Date(req.body.appointment_date),
-        appointment_time: timeString, // Prisma sẽ tự convert string sang TIME
+        appointment_time: dummyDate, // Prisma DateTime for @db.Time
         purpose: req.body.purpose || null,
         status: req.body.status || 'Scheduled' // Keep PascalCase - database constraint requires it
       };
@@ -476,6 +483,53 @@ class AppointmentController {
       });
     } catch (error) {
       console.error('Get current patient appointments error:', error);
+      res.status(400).json({
+        success: false,
+        error: error.message
+      });
+    }
+  }
+
+  // Check appointment availability
+  async checkAvailability(req, res) {
+    try {
+      const { doctor_id, appointment_date, appointment_time } = req.query;
+
+      if (!doctor_id || !appointment_date || !appointment_time) {
+        return res.status(400).json({
+          success: false,
+          error: 'Missing required parameters: doctor_id, appointment_date, appointment_time'
+        });
+      }
+
+      // Convert time string to DateTime for Prisma
+      const timeString = appointment_time; // "17:00"
+      const timeWithSeconds = timeString.includes(':') && timeString.split(':').length === 2 
+        ? `${timeString}:00` 
+        : timeString;
+      const dummyDate = new Date(`1970-01-01T${timeWithSeconds}Z`);
+
+      // Check if there's an existing appointment at this time slot
+      const existingAppointment = await prisma.appointments.findFirst({
+        where: {
+          doctor_id: Number(doctor_id),
+          appointment_date: new Date(appointment_date),
+          appointment_time: dummyDate,
+          status: {
+            in: ['Scheduled', 'Confirmed'] // Only check non-cancelled appointments
+          }
+        }
+      });
+
+      res.json({
+        success: true,
+        available: !existingAppointment,
+        message: existingAppointment 
+          ? 'Khung giờ này đã có người đặt' 
+          : 'Khung giờ này còn trống'
+      });
+    } catch (error) {
+      console.error('Check availability error:', error);
       res.status(400).json({
         success: false,
         error: error.message

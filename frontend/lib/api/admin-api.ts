@@ -72,13 +72,13 @@ export interface MaintenanceMode {
 export class AdminApiService {
   // Get admin dashboard overview
   async getDashboard(): Promise<AdminDashboardData> {
-    const response = await apiClient.get<{success: boolean, data: AdminDashboardData}>('/admin/dashboard')
+    const response = await apiClient.getRaw<{success: boolean, data: AdminDashboardData}>('/admin/dashboard')
     return response.data
   }
 
   // Get system statistics
   async getSystemStatistics(): Promise<SystemStatistics> {
-    const response = await apiClient.get<{success: boolean, data: SystemStatistics}>('/admin/system-stats')
+    const response = await apiClient.getRaw<{success: boolean, data: SystemStatistics}>('/admin/system-stats')
     return response.data
   }
 
@@ -105,7 +105,7 @@ export class AdminApiService {
     if (params?.role) queryParams.append('role', params.role)
     if (params?.status) queryParams.append('status', params.status)
 
-    const response = await apiClient.get<{
+    const response = await apiClient.getRaw<{
       success: boolean
       data: UserData[]
       pagination: any
@@ -148,7 +148,7 @@ export class AdminApiService {
     if (params?.date_from) queryParams.append('date_from', params.date_from)
     if (params?.date_to) queryParams.append('date_to', params.date_to)
 
-    const response = await apiClient.get<{
+    const response = await apiClient.getRaw<{
       success: boolean
       data: ActivityLog[]
       pagination: any
@@ -191,7 +191,7 @@ export class AdminApiService {
     api: string
     storage: string
   }> {
-    const response = await apiClient.get<{
+    const response = await apiClient.getRaw<{
       success: boolean
       data: {
         database: string
@@ -209,7 +209,7 @@ export class AdminApiService {
     role_name: string
     description: string
   }>> {
-    const response = await apiClient.get<{
+    const response = await apiClient.getRaw<{
       success: boolean
       data: Array<{
         role_id: number
@@ -235,6 +235,15 @@ export class AdminApiService {
       success: boolean
       data: any
     }>(`/admin/users/${userId}/roles/${roleId}`)
+    return response.data
+  }
+
+  // Delete user
+  async deleteUser(userId: string): Promise<any> {
+    const response = await apiClient.delete<{
+      success: boolean
+      message: string
+    }>(`/admin/users/${userId}`)
     return response.data
   }
 }

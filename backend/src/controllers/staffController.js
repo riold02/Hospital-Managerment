@@ -21,28 +21,74 @@ class StaffController {
         });
       }
 
-      const { email, password, ...staffData } = req.body;
+      const { email, password, first_name, last_name, position, department_id, phone, hire_date } = req.body;
 
       // Check if email already exists
-      const existingStaff = await prisma.staff.findFirst({
-        where: { email }
-      });
+      if (email) {
+        const existingUser = await prisma.users.findFirst({ where: { email } });
+        if (existingUser) {
+          return res.status(409).json({ success: false, error: 'Email already exists' });
+        }
+      }
 
-      if (existingStaff) {
-        return res.status(409).json({
-          success: false,
-          error: 'Staff with this email already exists'
+      // Hash password if provided
+      let hashedPassword = null;
+      if (password) {
+        hashedPassword = await bcrypt.hash(password, 10);
+      }
+
+      // Map position to role name
+      const roleMap = {
+        'nurse': 'nurse',
+        'pharmacist': 'pharmacist',
+        'technician': 'technician',
+        'lab_assistant': 'lab_assistant',
+        'cleaner': 'worker'        // Nhân viên vệ sinh -> worker
+      };
+      const roleName = roleMap[position] || 'worker';
+
+      // Create user account first if email and password provided
+      let userId = null;
+      if (email && hashedPassword) {
+        // Find role_id from roles table
+        const role = await prisma.roles.findUnique({
+          where: { role_name: roleName }
+        });
+        
+        if (!role) {
+          return res.status(500).json({ success: false, error: `Role '${roleName}' not found in system` });
+        }
+
+        // Create user
+        const user = await prisma.users.create({
+          data: {
+            email,
+            password_hash: hashedPassword,
+            is_active: true
+          }
+        });
+        userId = user.user_id;
+
+        // Assign role to user
+        await prisma.user_roles.create({
+          data: {
+            user_id: userId,
+            role_id: role.role_id,
+            is_active: true
+          }
         });
       }
 
       const newStaffData = {
-        first_name: staffData.first_name,
-        last_name: staffData.last_name,
+        user_id: userId,
+        first_name,
+        last_name,
         email,
-        role: staffData.role,
-        position: staffData.position,
-        department_id: staffData.department_id ? Number(staffData.department_id) : null,
-        contact_number: staffData.contact_number
+        role: roleName, // Required field in schema
+        position,
+        department_id: department_id ? Number(department_id) : null,
+        phone: phone ?? null,
+        hire_date: hire_date ? new Date(hire_date) : null
       };
 
       const data = await prisma.staff.create({
@@ -225,14 +271,63 @@ class StaffController {
     try {
       const { id } = req.params;
 
-      await prisma.staff.delete({
-        where: { staff_id: Number(id) }
+      // Use transaction to ensure all operations succeed or fail together
+      const result = await prisma.$transaction(async (tx) => {
+        // First, get the staff member to find the associated user_id
+        const staff = await tx.staff.findUnique({
+          where: { staff_id: Number(id) },
+          select: { user_id: true }
+        });
+
+        if (!staff) {
+          throw new Error('Staff member not found');
+        }
+
+        console.log('Deleting staff with user_id:', staff.user_id);
+
+        // Delete related records first to avoid foreign key constraints
+        // Delete room assignments
+        await tx.room_assignments.deleteMany({
+          where: { assigned_by: staff.user_id }
+        });
+        console.log('Room assignments deleted');
+
+        // Delete cleaning service records
+        await tx.cleaning_service.deleteMany({
+          where: { cleaned_by_user_id: staff.user_id }
+        });
+        console.log('Cleaning service records deleted');
+
+        // Delete nurse patient assignments
+        await tx.nurse_patient_assignments.deleteMany({
+          where: { nurse_id: Number(id) }
+        });
+        console.log('Nurse patient assignments deleted');
+
+        // Delete staff record
+        await tx.staff.delete({
+          where: { staff_id: Number(id) }
+        });
+        console.log('Staff record deleted');
+
+        // Delete user roles
+        if (staff.user_id) {
+          await tx.user_roles.deleteMany({
+            where: { user_id: staff.user_id }
+          });
+          console.log('User roles deleted');
+
+          // Delete user account
+          await tx.users.delete({
+            where: { user_id: staff.user_id }
+          });
+          console.log('User account deleted');
+        }
+
+        return { success: true, message: 'Staff member and user account deleted successfully' };
       });
 
-      res.json({
-        success: true,
-        message: 'Staff member deleted successfully'
-      });
+      res.json(result);
     } catch (error) {
       console.error('Delete staff error:', error);
       res.status(400).json({

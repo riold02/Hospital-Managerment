@@ -78,7 +78,7 @@ export interface PrescriptionData {
 export class DoctorApiService {
   // Get doctor dashboard overview
   async getDashboard(): Promise<DoctorDashboardData> {
-    const response = await apiClient.get<{success: boolean, data: DoctorDashboardData}>('/doctor/dashboard')
+    const response = await apiClient.getRaw<{success: boolean, data: DoctorDashboardData}>('/doctor/dashboard')
     return response.data
   }
 
@@ -103,7 +103,7 @@ export class DoctorApiService {
     if (params?.search) queryParams.append('search', params.search)
     if (params?.specialty) queryParams.append('specialty', params.specialty)
 
-    const response = await apiClient.get<{
+    const response = await apiClient.getRaw<{
       success: boolean
       data: DoctorInfo[]
       pagination: any
@@ -121,7 +121,7 @@ export class DoctorApiService {
     specialties: Record<string, number>
     uniqueSpecialties: number
   }> {
-    const response = await apiClient.get<{
+    const response = await apiClient.getRaw<{
       success: boolean
       data: {
         total: number
@@ -148,7 +148,7 @@ export class DoctorApiService {
     if (params?.date) queryParams.append('date', params.date)
     if (params?.status) queryParams.append('status', params.status)
 
-    const response = await apiClient.get<{
+    const response = await apiClient.getRaw<{
       success: boolean
       data: AppointmentData[]
       pagination: any
@@ -174,7 +174,7 @@ export class DoctorApiService {
     if (params?.limit) queryParams.append('limit', params.limit.toString())
     if (params?.search) queryParams.append('search', params.search)
 
-    const response = await apiClient.get<{
+    const response = await apiClient.getRaw<{
       success: boolean
       data: any[]
       pagination: any
@@ -200,7 +200,7 @@ export class DoctorApiService {
     if (params?.limit) queryParams.append('limit', params.limit.toString())
     if (params?.patient_id) queryParams.append('patient_id', params.patient_id.toString())
 
-    const response = await apiClient.get<{
+    const response = await apiClient.getRaw<{
       success: boolean
       data: MedicalRecord[]
       pagination: any
@@ -226,7 +226,7 @@ export class DoctorApiService {
     if (params?.limit) queryParams.append('limit', params.limit.toString())
     if (params?.status) queryParams.append('status', params.status)
 
-    const response = await apiClient.get<{
+    const response = await apiClient.getRaw<{
       success: boolean
       data: PrescriptionData[]
       pagination: any
@@ -243,7 +243,7 @@ export class DoctorApiService {
     schedule: string
     availability: any
   }> {
-    const response = await apiClient.get<{
+    const response = await apiClient.getRaw<{
       success: boolean
       data: {
         schedule: string
@@ -290,11 +290,55 @@ export class DoctorApiService {
 
   // Get all medicines for prescription
   async getMedicines(): Promise<any[]> {
-    const response = await apiClient.get<{
+    const response = await apiClient.getRaw<{
       success: boolean
       data: any[]
     }>('/medicine')
     return response.data
+  }
+
+  // Create doctor
+  async createDoctor(data: {
+    first_name: string
+    last_name: string
+    specialty: string
+    phone?: string
+    email?: string
+    password?: string
+    available_schedule?: string
+  }): Promise<DoctorInfo> {
+    const response = await apiClient.post<{
+      success: boolean
+      data: DoctorInfo
+    }>('/doctors', data)
+    return response.data
+  }
+
+  // Update doctor
+  async updateDoctor(doctorId: number, data: {
+    first_name?: string
+    last_name?: string
+    specialty?: string
+    phone?: string
+    email?: string
+    available_schedule?: string
+  }): Promise<DoctorInfo> {
+    const response = await apiClient.put<{
+      success: boolean
+      data: DoctorInfo
+    }>(`/doctors/${doctorId}`, data)
+    return response.data
+  }
+
+  // Delete doctor
+  async deleteDoctor(doctorId: number): Promise<void> {
+    await apiClient.delete(`/doctors/${doctorId}`)
+  }
+
+  // Get departments
+  async getDepartments(): Promise<any> {
+    const response = await apiClient.get('/departments')
+    return response
   }
 }
 

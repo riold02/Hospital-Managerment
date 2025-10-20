@@ -1,6 +1,4 @@
-"use client"
-
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { formatAppointmentTime } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Label } from "@/components/ui/label"
@@ -184,26 +182,7 @@ const ChartTab = ({
 }: ChartTabProps) => {
   const formatTime = (time: string | undefined) => {
     if (!time) return "N/A"
-
-    if (typeof time === "string" && time.includes("T")) {
-      try {
-        const date = new Date(time)
-        return date.toLocaleTimeString("vi-VN", {
-          hour: "2-digit",
-          minute: "2-digit",
-          hour12: false,
-        })
-      } catch {
-        return "N/A"
-      }
-    }
-
-    if (typeof time === "string" && time.includes(":")) {
-      const parts = time.split(":")
-      return `${parts[0]}:${parts[1]}`
-    }
-
-    return String(time)
+    return formatAppointmentTime(time)
   }
 
   const getGenderDisplay = () => {

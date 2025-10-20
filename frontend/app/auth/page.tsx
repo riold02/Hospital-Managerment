@@ -7,10 +7,8 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Separator } from "@/components/ui/separator"
-import { Heart, Eye, EyeOff, Mail, Lock, User, Play, Calendar, Stethoscope, Shield, Activity } from "lucide-react"
+import { Heart, Eye, EyeOff, Mail, Lock, User, Calendar, Stethoscope, Shield, Activity } from "lucide-react"
 import { cn } from "@/lib/utils"
-import { demoAccounts } from "@/lib/demo-accounts"
 import { useAuth } from "@/lib/auth-context"
 import { useRouter } from "next/navigation"
 import { apiClient } from "@/lib/api-client"
@@ -130,29 +128,6 @@ export default function AuthPage() {
       } finally {
         setIsLoading(false)
       }
-    }
-  }
-
-  const handleDemoLogin = async (account: (typeof demoAccounts)[0]) => {
-    setIsLoading(true)
-    try {
-      // Use real API authentication for demo accounts
-      const response = await apiClient.login(account.email, account.password)
-      console.log("Demo login API response:", response)
-
-      // Clear any old data
-      localStorage.removeItem("user_info")
-      localStorage.removeItem("user_role")
-
-      await login(response.token)
-      
-      // The login function in auth-context now handles automatic redirection
-      // based on user role, so we don't need manual redirect here
-    } catch (error) {
-      console.error("Demo login failed:", error)
-      setErrors({ email: "Đăng nhập demo thất bại. Vui lòng thử lại." })
-    } finally {
-      setIsLoading(false)
     }
   }
 
@@ -510,47 +485,6 @@ export default function AuthPage() {
                     {isLoading ? "Đang xử lý..." : isLogin ? "Đăng nhập" : "Tạo tài khoản"}
                   </Button>
                 </form>
-
-                {isLogin && (
-                  <>
-                    <div className="relative">
-                      <div className="absolute inset-0 flex items-center">
-                        <Separator className="w-full" />
-                      </div>
-                      <div className="relative flex justify-center text-xs uppercase">
-                        <span className="bg-card px-3 text-muted-foreground font-medium">Tài khoản demo</span>
-                      </div>
-                    </div>
-
-                    <div className="space-y-4">
-                      <p className="text-sm text-muted-foreground text-center font-medium">
-                        Chọn vai trò để trải nghiệm hệ thống:
-                      </p>
-                      <div className="grid grid-cols-2 gap-3">
-                        {demoAccounts.map((account) => (
-                          <Button
-                            key={account.role}
-                            variant="outline"
-                            size="sm"
-                            className="justify-start text-xs bg-transparent hover:bg-primary/10 font-medium h-10 rounded-xl border-2"
-                            onClick={() => handleDemoLogin(account)}
-                          >
-                            <Play className="w-3 h-3 mr-2" />
-                            {account.role === "Admin" && "Quản trị viên"}
-                            {account.role === "Doctor" && "Bác sĩ"}
-                            {account.role === "Nurse" && "Y tá"}
-                            {account.role === "Patient" && "Bệnh nhân"}
-                            {account.role === "Pharmacist" && "Dược sĩ"}
-                            {account.role === "Technician" && "Kỹ thuật viên"}
-                            {account.role === "Lab Assistant" && "Xét nghiệm"}
-                            {account.role === "Driver" && "Tài xế"}
-                            {account.role === "Worker" && "Nhân viên"}
-                          </Button>
-                        ))}
-                      </div>
-                    </div>
-                  </>
-                )}
 
                 {isLogin && (
                   <p className="text-center text-sm text-muted-foreground">

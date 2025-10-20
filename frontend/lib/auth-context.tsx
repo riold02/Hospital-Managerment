@@ -94,13 +94,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       apiClient
         .get("/auth/me")
         .then((resp: any) => {
-          if (resp?.success && resp?.data) {
-            console.log("[AUTH] Successfully loaded real user:", resp.data)
-            setUser(resp.data as User)
-            const primaryRole = (resp.data.roles?.[0] || resp.data.role || "patient").toLowerCase()
+          if (resp) {
+            console.log("[AUTH] Successfully loaded real user:", resp)
+            setUser(resp as User)
+            const primaryRole = (resp.roles?.[0] || resp.role || "patient").toLowerCase()
             setIsDemo(false)
             localStorage.setItem("user_role", primaryRole)
-            localStorage.setItem("user_info", JSON.stringify(resp.data))
+            localStorage.setItem("user_info", JSON.stringify(resp))
             console.log("[AUTH] Real user role:", primaryRole)
           }
         })
@@ -152,8 +152,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       } else {
         // For real users, always call /auth/me to get fresh data from backend
         const resp: any = await apiClient.get("/auth/me")
-        if (resp?.success && resp?.data) {
-          const userData = resp.data as User
+        if (resp) {
+          const userData = resp as User
           setUser(userData)
           const primaryRole = (userData.roles?.[0] || userData.role || "patient").toLowerCase()
           setIsDemo(false)

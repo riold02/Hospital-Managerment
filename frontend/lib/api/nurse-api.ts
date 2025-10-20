@@ -73,7 +73,7 @@ export interface CarePlan {
 export class NurseApiService {
   // Get nurse dashboard overview
   async getDashboard(): Promise<NurseDashboardData> {
-    const response = await apiClient.get<{success: boolean, data: NurseDashboardData}>('/nurse/dashboard')
+    const response = await apiClient.getRaw<{success: boolean, data: NurseDashboardData}>('/nurse/dashboard')
     return response.data
   }
 
@@ -93,7 +93,7 @@ export class NurseApiService {
     if (params?.room) queryParams.append('room', params.room)
     if (params?.priority) queryParams.append('priority', params.priority)
 
-    const response = await apiClient.get<{
+    const response = await apiClient.getRaw<{
       success: boolean
       data: PatientAssignment[]
       pagination: any
@@ -163,7 +163,7 @@ export class NurseApiService {
     if (params?.patient_id) queryParams.append('patient_id', params.patient_id.toString())
     if (params?.status) queryParams.append('status', params.status)
 
-    const response = await apiClient.get<{
+    const response = await apiClient.getRaw<{
       success: boolean
       data: MedicationSchedule[]
       pagination: any

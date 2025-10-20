@@ -102,11 +102,11 @@ class RoomsApi {
     if (params?.sortOrder) queryParams.append('sortOrder', params.sortOrder)
 
     const url = `/rooms${queryParams.toString() ? `?${queryParams.toString()}` : ''}`
-    return apiClient.get<{ success: boolean; data: Room[]; pagination?: any }>(url)
+    return apiClient.getRaw<{ success: boolean; data: Room[]; pagination?: any }>(url)
   }
 
   async getRoomById(id: number) {
-    return apiClient.get<{ success: boolean; data: Room }>(`/rooms/${id}`)
+    return apiClient.getRaw<{ success: boolean; data: Room }>(`/rooms/${id}`)
   }
 
   async createRoom(data: any) {
@@ -135,7 +135,7 @@ class RoomsApi {
     if (params?.sortOrder) queryParams.append('sortOrder', params.sortOrder)
 
     const url = `/room-assignments${queryParams.toString() ? `?${queryParams.toString()}` : ''}`
-    return apiClient.get<{ success: boolean; data: RoomAssignment[]; pagination?: any }>(url)
+    return apiClient.getRaw<{ success: boolean; data: RoomAssignment[]; pagination?: any }>(url)
   }
 
   async getRoomAssignmentById(id: number) {

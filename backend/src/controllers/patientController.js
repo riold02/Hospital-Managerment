@@ -1,5 +1,6 @@
 const { prisma } = require('../config/prisma');
 const { validationResult } = require('express-validator');
+const bcrypt = require('bcryptjs');
 
 class PatientController {
   // Create patient
@@ -15,36 +16,87 @@ class PatientController {
         });
       }
 
-      const patientData = {
-        first_name: req.body.first_name,
-        last_name: req.body.last_name,
-        date_of_birth: new Date(req.body.date_of_birth),
-        gender: req.body.gender,
-        contact_number: req.body.contact_number ?? null,
-        address: req.body.address ?? null,
-        email: req.body.email ?? null,
-        medical_history: req.body.medical_history ?? null
-      };
+      const { 
+        first_name, last_name, date_of_birth, gender, phone, 
+        address, email, password, blood_type,
+        emergency_contact_name, emergency_contact_phone, medical_history 
+      } = req.body;
 
       // Check if email already exists
-      let existingPatient = null;
-      if (patientData.email) {
-        existingPatient = await prisma.patients.findFirst({ where: { email: patientData.email } });
+      if (email) {
+        const existingUser = await prisma.users.findFirst({ where: { email } });
+        if (existingUser) {
+          return res.status(409).json({ success: false, error: 'Email already exists' });
+        }
       }
 
-      if (existingPatient) {
-        return res.status(409).json({
-          success: false,
-          error: 'Patient with this email already exists'
+      // Hash password if provided
+      let hashedPassword = null;
+      if (password) {
+        hashedPassword = await bcrypt.hash(password, 10);
+      }
+
+      // Create user account first if email and password provided
+      let userId = null;
+      if (email && hashedPassword) {
+        // Find patient role_id
+        const patientRole = await prisma.roles.findUnique({
+          where: { role_name: 'patient' }
+        });
+        
+        if (!patientRole) {
+          return res.status(500).json({ success: false, error: 'Patient role not found in system' });
+        }
+
+        // Create user
+        const user = await prisma.users.create({
+          data: {
+            email,
+            password_hash: hashedPassword,
+            is_active: true
+          }
+        });
+        userId = user.user_id;
+
+        // Assign patient role to user
+        await prisma.user_roles.create({
+          data: {
+            user_id: userId,
+            role_id: patientRole.role_id,
+            is_active: true
+          }
         });
       }
+
+      // Generate patient code
+      const lastPatient = await prisma.patients.findFirst({
+        orderBy: { patient_id: 'desc' }
+      });
+      const nextId = lastPatient ? lastPatient.patient_id + 1 : 1;
+      const patient_code = `P${String(nextId).padStart(6, '0')}`;
+
+      const patientData = {
+        user_id: userId,
+        patient_code,
+        first_name,
+        last_name,
+        date_of_birth: date_of_birth ? new Date(date_of_birth) : null,
+        gender: gender ?? null,
+        phone: phone ?? null,
+        address: address ?? null,
+        email: email ?? null,
+        blood_type: blood_type ?? null,
+        emergency_contact_name: emergency_contact_name ?? null,
+        emergency_contact_phone: emergency_contact_phone ?? null,
+        medical_history: medical_history ?? null
+      };
 
       const data = await prisma.patients.create({ data: patientData });
 
       res.status(201).json({
         success: true,
         data,
-        message: 'Patient created successfully'
+        message: 'Patient and user account created successfully'
       });
     } catch (error) {
       console.error('Create patient error:', error);
@@ -196,13 +248,49 @@ class PatientController {
     }
   }
 
-  // Delete patient (soft delete)
+  // Delete patient (hard delete)
   async deletePatient(req, res) {
     try {
       const { id } = req.params;
 
-      await prisma.patients.delete({ where: { patient_id: Number(id) } });
-      res.json({ success: true, message: 'Patient deleted successfully' });
+      // Use transaction to ensure all operations succeed or fail together
+      const result = await prisma.$transaction(async (tx) => {
+        // First, get the patient to find the associated user_id
+        const patient = await tx.patients.findUnique({
+          where: { patient_id: Number(id) },
+          select: { user_id: true }
+        });
+
+        if (!patient) {
+          throw new Error('Patient not found');
+        }
+
+        console.log('Deleting patient with user_id:', patient.user_id);
+
+        // Delete patient record (this will cascade to related records)
+        await tx.patients.delete({ 
+          where: { patient_id: Number(id) } 
+        });
+        console.log('Patient record deleted');
+
+        // Delete user roles
+        if (patient.user_id) {
+          await tx.user_roles.deleteMany({
+            where: { user_id: patient.user_id }
+          });
+          console.log('User roles deleted');
+
+          // Delete user account
+          await tx.users.delete({
+            where: { user_id: patient.user_id }
+          });
+          console.log('User account deleted');
+        }
+
+        return { success: true, message: 'Patient and user account deleted successfully' };
+      });
+
+      res.json(result);
     } catch (error) {
       console.error('Delete patient error:', error);
       res.status(400).json({

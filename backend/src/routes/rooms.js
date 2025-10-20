@@ -307,6 +307,138 @@ router.get('/rooms/available', authenticateToken, roomController.getAvailableRoo
  */
 router.get('/rooms/stats', authenticateToken, requireStaff, roomController.getRoomStats);
 
+// Room Assignments Routes (MUST be before /rooms/:id to avoid matching conflicts)
+/**
+ * @swagger
+ * /api/v1/room-assignments:
+ *   get:
+ *     summary: Get all room assignments
+ *     tags: [Room Management]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: room_id
+ *         schema:
+ *           type: integer
+ *         description: Filter by room ID
+ *       - in: query
+ *         name: assignment_type
+ *         schema:
+ *           type: string
+ *           enum: [Patient, Staff]
+ *         description: Filter by assignment type
+ *       - in: query
+ *         name: active_only
+ *         schema:
+ *           type: boolean
+ *         description: Show only active assignments
+ *     responses:
+ *       200:
+ *         description: List of room assignments
+ */
+router.get('/room-assignments', authenticateToken, roomAssignmentController.getAllRoomAssignments);
+
+/**
+ * @swagger
+ * /api/v1/room-assignments:
+ *   post:
+ *     summary: Create room assignment
+ *     tags: [Room Management]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - room_id
+ *               - assignment_type
+ *               - start_date
+ *             properties:
+ *               room_id:
+ *                 type: integer
+ *               assignment_type:
+ *                 type: string
+ *                 enum: [Patient, Staff]
+ *               patient_id:
+ *                 type: integer
+ *               staff_id:
+ *                 type: integer
+ *               start_date:
+ *                 type: string
+ *                 format: date
+ *               end_date:
+ *                 type: string
+ *                 format: date
+ *     responses:
+ *       201:
+ *         description: Room assignment created successfully
+ */
+router.post('/room-assignments', authenticateToken, requireStaff, validateRoomAssignment, roomAssignmentController.createRoomAssignment);
+
+/**
+ * @swagger
+ * /api/v1/room-assignments/{id}:
+ *   get:
+ *     summary: Get room assignment by ID
+ *     tags: [Room Management]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       200:
+ *         description: Room assignment details
+ */
+router.get('/room-assignments/:id', authenticateToken, roomAssignmentController.getRoomAssignmentById);
+
+/**
+ * @swagger
+ * /api/v1/room-assignments/{id}:
+ *   put:
+ *     summary: Update room assignment
+ *     tags: [Room Management]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       200:
+ *         description: Room assignment updated successfully
+ */
+router.put('/room-assignments/:id', authenticateToken, requireStaff, validateRoomAssignmentUpdate, roomAssignmentController.updateRoomAssignment);
+
+/**
+ * @swagger
+ * /api/v1/room-assignments/{id}:
+ *   delete:
+ *     summary: Delete room assignment
+ *     tags: [Room Management]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       200:
+ *         description: Room assignment deleted successfully
+ */
+router.delete('/room-assignments/:id', authenticateToken, requireStaff, roomAssignmentController.deleteRoomAssignment);
+
 /**
  * @swagger
  * /api/v1/rooms/{id}:
@@ -366,159 +498,5 @@ router.put('/rooms/:id', authenticateToken, requireStaff, validateRoomUpdate, ro
  *         description: Room deleted successfully
  */
 router.delete('/rooms/:id', authenticateToken, requireAdmin, roomController.deleteRoom);
-
-// Room Assignments Routes
-/**
- * @swagger
- * /api/v1/room-assignments:
- *   get:
- *     summary: Get all room assignments
- *     tags: [Room Management]
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: query
- *         name: room_id
- *         schema:
- *           type: integer
- *         description: Filter by room ID
- *       - in: query
- *         name: assignment_type
- *         schema:
- *           type: string
- *           enum: [PATIENT, STAFF]
- *         description: Filter by assignment type
- *       - in: query
- *         name: active_only
- *         schema:
- *           type: boolean
- *         description: Show only active assignments
- *     responses:
- *       200:
- *         description: List of room assignments
- */
-router.get('/room-assignments', authenticateToken, roomAssignmentController.getAllRoomAssignments);
-
-/**
- * @swagger
- * /api/v1/room-assignments:
- *   post:
- *     summary: Create room assignment
- *     tags: [Room Management]
- *     security:
- *       - bearerAuth: []
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required:
- *               - room_id
- *               - assignment_type
- *               - start_date
- *             properties:
- *               room_id:
- *                 type: integer
- *               assignment_type:
- *                 type: string
- *                 enum: [PATIENT, STAFF]
- *               patient_id:
- *                 type: integer
- *                 description: Required for PATIENT assignments
- *               staff_id:
- *                 type: integer
- *                 description: Required for STAFF assignments
- *               start_date:
- *                 type: string
- *                 format: date
- *               end_date:
- *                 type: string
- *                 format: date
- *     responses:
- *       201:
- *         description: Room assignment created successfully
- */
-router.post('/room-assignments', authenticateToken, requireStaff, validateRoomAssignment, roomAssignmentController.createRoomAssignment);
-
-/**
- * @swagger
- * /api/v1/room-assignments/{id}:
- *   get:
- *     summary: Get room assignment by ID
- *     tags: [Room Management]
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: integer
- *     responses:
- *       200:
- *         description: Room assignment details
- */
-router.get('/room-assignments/:id', authenticateToken, roomAssignmentController.getRoomAssignmentById);
-
-/**
- * @swagger
- * /api/v1/room-assignments/{id}:
- *   put:
- *     summary: Update room assignment
- *     tags: [Room Management]
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: integer
- *     responses:
- *       200:
- *         description: Room assignment updated successfully
- */
-router.put('/room-assignments/:id', authenticateToken, requireStaff, validateRoomAssignmentUpdate, roomAssignmentController.updateRoomAssignment);
-
-/**
- * @swagger
- * /api/v1/room-assignments/{id}/end:
- *   patch:
- *     summary: End room assignment
- *     tags: [Room Management]
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: integer
- *     responses:
- *       200:
- *         description: Room assignment ended successfully
- */
-router.patch('/room-assignments/:id/end', authenticateToken, requireStaff, roomAssignmentController.endRoomAssignment);
-
-/**
- * @swagger
- * /api/v1/room-assignments/{id}:
- *   delete:
- *     summary: Delete room assignment
- *     tags: [Room Management]
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: integer
- *     responses:
- *       200:
- *         description: Room assignment deleted successfully
- */
-router.delete('/room-assignments/:id', authenticateToken, requireStaff, roomAssignmentController.deleteRoomAssignment);
 
 module.exports = router;

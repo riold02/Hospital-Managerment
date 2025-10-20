@@ -123,6 +123,11 @@ export default function NurseDashboard() {
 
   // Filter and sort billing records
   useEffect(() => {
+    if (!Array.isArray(billingRecords)) {
+      setFilteredBillingRecords([])
+      return
+    }
+
     let filtered = [...billingRecords]
 
     // Filter by status
@@ -157,7 +162,6 @@ export default function NurseDashboard() {
 
   const loadDashboardData = async () => {
     setLoading(true)
-    console.log('Loading nurse dashboard data for user:', user)
     
     try {
       // Use Promise.allSettled to prevent one failure from blocking others
@@ -165,7 +169,6 @@ export default function NurseDashboard() {
         // Load nurse dashboard data
         nurseApi.getDashboard()
           .then(response => {
-            console.log('Nurse Dashboard API Response:', response)
             setDashboardData(response)
           })
           .catch(err => console.error('Dashboard API error:', err)),
@@ -173,7 +176,6 @@ export default function NurseDashboard() {
         // Load patient assignments
         nurseApi.getPatientAssignments({ limit: 20 })
           .then(response => {
-            console.log('Patient Assignments API Response:', response)
             setPatientAssignments(response.data)
           })
           .catch(err => console.error('Patient Assignments API error:', err)),
@@ -181,7 +183,6 @@ export default function NurseDashboard() {
         // Load medication schedule
         nurseApi.getMedicationSchedule({ limit: 20 })
           .then(response => {
-            console.log('Medication Schedule API Response:', response)
             setMedicationSchedule(response.data)
           })
           .catch(err => console.error('Medication Schedule API error:', err)),
@@ -202,7 +203,7 @@ export default function NurseDashboard() {
         // Load billing records
         billingApi.getAllBilling({ limit: 50 })
           .then(response => {
-            setBillingRecords(response.data)
+            setBillingRecords(Array.isArray(response.data) ? response.data : [])
           })
           .catch(err => console.error('Billing API error:', err)),
 
@@ -331,7 +332,7 @@ export default function NurseDashboard() {
   const loadBillingRecords = async () => {
     try {
       const response = await billingApi.getAllBilling({ limit: 50 })
-      setBillingRecords(response.data)
+      setBillingRecords(Array.isArray(response.data) ? response.data : [])
     } catch (error) {
       console.error("Error loading billing records:", error)
     }
@@ -1076,8 +1077,14 @@ export default function NurseDashboard() {
                                bill.payment_status?.toUpperCase() === 'OVERDUE' ? 'Quá hạn' :
                                bill.payment_status?.toUpperCase() === 'CANCELLED' ? 'Đã hủy' : bill.payment_status}
                             </Badge>
-                            {bill.payment_method?.toUpperCase() === 'CASH' && (
-                              <Badge variant="outline" className="text-xs">Tiền mặt</Badge>
+                            {bill.payment_method && (
+                              <Badge variant="outline" className="text-xs">
+                                {bill.payment_method === 'CASH' ? '💵 Tiền mặt' : 
+                                 bill.payment_method === 'TRANSFER' ? '🏦 Chuyển khoản' :
+                                 bill.payment_method === 'MOMO' ? '📱 MoMo' :
+                                 bill.payment_method === 'VNPAY' ? '💳 VNPay' :
+                                 bill.payment_method}
+                              </Badge>
                             )}
                           </div>
                           <p className="text-sm text-gray-600">
@@ -1156,7 +1163,7 @@ export default function NurseDashboard() {
               setShowAddBillingDialog(false)
               // Reload billing records
               billingApi.getAllBilling({ limit: 50 })
-                .then(response => setBillingRecords(response.data))
+                .then(response => setBillingRecords(Array.isArray(response.data) ? response.data : []))
                 .catch(err => console.error('Error reloading billing:', err))
             }}
           />

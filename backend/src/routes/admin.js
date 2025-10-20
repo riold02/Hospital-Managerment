@@ -70,6 +70,33 @@ router.get('/system-stats', adminController.getSystemStats);
  *       200:
  *         description: Users retrieved successfully
  */
+/**
+ * @swagger
+ * /api/v1/admin/users/{userId}:
+ *   delete:
+ *     summary: Delete a user
+ *     tags: [Admin]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: userId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: User ID to delete
+ *     responses:
+ *       200:
+ *         description: User deleted successfully
+ *       400:
+ *         description: Cannot delete user with associated records
+ *       404:
+ *         description: User not found
+ *       401:
+ *         description: Unauthorized - Admin access required
+ */
+router.post('/delete-user', adminController.deleteUser);
+
 router.get('/users', adminController.getAllUsers);
 
 /**
@@ -133,7 +160,7 @@ router.put('/users/:userId/status', adminController.updateUserStatus);
  *       200:
  *         description: User role updated successfully
  */
-router.put('/users/:userId/status', adminController.updateUserStatus);
+router.put('/users/:userId/role', adminController.updateUserRole);
 
 /**
  * @swagger

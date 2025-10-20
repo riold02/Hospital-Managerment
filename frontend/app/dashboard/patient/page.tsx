@@ -43,6 +43,8 @@ import { useAuth } from "@/lib/auth-context"
 import { apiClient, ApiError } from "@/lib/api-client"
 import { useRouter } from "next/navigation"
 import PatientOverview from "@/components/patient/PatientOverview"
+import MedicalHistoryList from "@/components/patient/MedicalHistoryList"
+import MedicalRecordDetailDialog from "@/components/patient/MedicalRecordDetailDialog"
 
 interface Appointment {
   id?: number
@@ -62,18 +64,6 @@ interface Appointment {
   patient?: { patient_id?: number; first_name?: string; last_name?: string }
   created_at?: string
   updated_at?: string
-}
-
-interface Prescription {
-  id: number
-  doctor: string
-  date: string
-  medications: Array<{
-    name: string
-    dosage: string
-    duration: string
-  }>
-  status: string
 }
 
 interface MedicalRecord {
@@ -114,7 +104,6 @@ export default function PatientDashboard() {
   const [activeTab, setActiveTab] = useState("overview")
   const [appointments, setAppointments] = useState<Appointment[]>([])
   const [allAppointments, setAllAppointments] = useState<Appointment[]>([]) // Store all appointments
-  const [prescriptions, setPrescriptions] = useState<Prescription[]>([])
   const [medicalHistory, setMedicalHistory] = useState<MedicalRecord[]>([])
   const [billing, setBilling] = useState<Bill[]>([])
   const [loading, setLoading] = useState(true)
@@ -141,6 +130,7 @@ export default function PatientDashboard() {
   const { toast } = useToast()
   const { user, logout } = useAuth()
 
+  // Parse medications from string format
   // Filter appointments based on days and status
   const filterAppointments = (appointments: Appointment[]) => {
     const now = new Date()
@@ -268,10 +258,10 @@ export default function PatientDashboard() {
         // Fetch patient's profile first (most important)
         try {
           const profileData = await apiClient.get("/auth/patient/profile")
-          if (profileData.success && profileData.data) {
-            setPatientProfile(profileData.data.patient)
+          if (profileData && profileData.patient) {
+            setPatientProfile(profileData.patient)
             // Initialize form with current data
-            const profile = profileData.data.patient
+            const profile = profileData.patient
             setProfileForm({
               first_name: profile.first_name || '',
               last_name: profile.last_name || '',
@@ -368,25 +358,77 @@ export default function PatientDashboard() {
           setAppointments([])
         }
 
+        // Fetch medical records for current patient
         try {
-          const prescriptionsData = await apiClient.get("/prescriptions")
-          setPrescriptions(Array.isArray(prescriptionsData) ? prescriptionsData : [])
-        } catch (error) {
-          console.error("[v0] Error fetching prescriptions:", error)
-          setPrescriptions([])
-        }
-
-        try {
-          const medicalData = await apiClient.getMedicalRecords()
-          setMedicalHistory(Array.isArray(medicalData) ? medicalData : [])
-        } catch (error) {
-          console.error("[v0] Error fetching medical records:", error)
+          console.log("[Patient Dashboard] Fetching medical records...")
+          const medicalData = await apiClient.getMedicalRecords(user.patient_id?.toString())
+          
+          console.log("[Patient Dashboard] Medical records response:", medicalData)
+          console.log("[Patient Dashboard] Is array?:", Array.isArray(medicalData))
+          console.log("[Patient Dashboard] Records count:", Array.isArray(medicalData) ? medicalData.length : 0)
+          
+          // Transform data to match component interface
+          const transformedRecords = Array.isArray(medicalData)
+            ? medicalData.map((r, index) => {
+                console.log(`[Patient Dashboard] Record ${index + 1}:`, {
+                  id: r.record_id || r.id,
+                  doctor: r.doctor,
+                  diagnosis: r.diagnosis?.substring(0, 50) + '...',
+                })
+                
+                return {
+                  id: r.record_id || r.id,
+                  record_id: r.record_id || r.id,
+                  date: r.visit_date ? new Date(r.visit_date).toLocaleDateString('vi-VN') : 
+                        r.created_at ? new Date(r.created_at).toLocaleDateString('vi-VN') : 'N/A',
+                  doctor: r.doctor ? `${r.doctor.first_name} ${r.doctor.last_name}` : 'N/A',
+                  doctor_name: r.doctor ? `${r.doctor.first_name} ${r.doctor.last_name}` : 'N/A',
+                  diagnosis: r.diagnosis || '',
+                  treatment: r.treatment || '',
+                  notes: r.notes || '',
+                  prescription: r.prescription || '',
+                  status: r.status || '',
+                  created_at: r.created_at
+                }
+              })
+            : []
+          
+          console.log("[Patient Dashboard] ✅ Transformed", transformedRecords.length, "medical records")
+          setMedicalHistory(transformedRecords)
+        } catch (error: any) {
+          console.error("[Patient Dashboard] ❌ Error fetching medical records:", error)
+          console.error("[Patient Dashboard] Error message:", error?.message)
+          console.error("[Patient Dashboard] Error status:", error?.status)
           setMedicalHistory([])
+          
+          // Show toast error
+          toast({
+            title: "Lỗi tải hồ sơ",
+            description: error?.message || "Không thể tải hồ sơ khám bệnh",
+            variant: "destructive",
+          })
         }
 
         try {
           const billingData = await apiClient.getBilling()
-          setBilling(Array.isArray(billingData) ? billingData : [])
+          
+          // Transform billing data to match component interface
+          const transformedBilling = Array.isArray(billingData)
+            ? billingData.map(b => ({
+                id: b.bill_id || b.id,
+                bill_id: b.bill_id || b.id,
+                description: b.medical_record?.diagnosis || 'Khám bệnh',
+                amount: parseFloat(b.total_amount) || 0,
+                date: b.billing_date ? new Date(b.billing_date).toLocaleDateString('vi-VN') : 
+                      b.created_at ? new Date(b.created_at).toLocaleDateString('vi-VN') : 'N/A',
+                dueDate: b.payment_date ? new Date(b.payment_date).toLocaleDateString('vi-VN') : 'Chưa có',
+                status: b.payment_status === 'PAID' ? 'Đã thanh toán' : 
+                       b.payment_status === 'PENDING' ? 'Chưa thanh toán' : 
+                       b.payment_status || 'Chưa thanh toán'
+              }))
+            : []
+          
+          setBilling(transformedBilling)
         } catch (error) {
           console.error("[v0] Error fetching billing:", error)
           setBilling([])
@@ -567,8 +609,8 @@ export default function PatientDashboard() {
   const handleSaveProfile = async () => {
     try {
       const response = await apiClient.put("/auth/patient/profile", profileForm)
-      if (response.success && response.data) {
-        setPatientProfile(response.data.patient)
+      if (response && response.patient) {
+        setPatientProfile(response.patient)
         setIsEditingProfile(false)
         toast({
           title: "Cập nhật thành công",
@@ -730,18 +772,6 @@ export default function PatientDashboard() {
           </button>
 
           <button
-            onClick={() => setActiveTab("prescriptions")}
-            className={`w-full flex items-center space-x-3 px-3 py-2 rounded-lg text-left transition-colors ${
-              activeTab === "prescriptions"
-                ? "bg-blue-50 text-blue-700 border-r-2 border-blue-700"
-                : "text-gray-700 hover:bg-gray-50"
-            }`}
-          >
-            <FileText className="h-5 w-5" />
-            <span>Đơn thuốc</span>
-          </button>
-
-          <button
             onClick={() => setActiveTab("history")}
             className={`w-full flex items-center space-x-3 px-3 py-2 rounded-lg text-left transition-colors ${
               activeTab === "history"
@@ -784,14 +814,13 @@ export default function PatientDashboard() {
           {/* Header */}
           <div className="bg-white rounded-lg shadow-sm p-6">
             <h1 className="text-2xl font-bold text-gray-900 mb-2">Bảng điều khiển bệnh nhân</h1>
-            <p className="text-gray-600">Quản lý lịch hẹn, đơn thuốc và hồ sơ y tế của bạn</p>
+            <p className="text-gray-600">Quản lý lịch hẹn và hồ sơ y tế của bạn</p>
           </div>
 
           {activeTab === "overview" && (
             <PatientOverview
               patientProfile={patientProfile}
               appointments={appointments}
-              prescriptions={prescriptions}
               medicalHistory={medicalHistory}
               billing={billing}
               upcomingAppointments={upcomingAppointments}
@@ -1113,90 +1142,22 @@ export default function PatientDashboard() {
             </Dialog>
           )}
 
-          {activeTab === "prescriptions" && (
-            <Card>
-              <CardHeader>
-                <CardTitle>Đơn thuốc của tôi</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  {prescriptions.map((prescription) => (
-                    <Card key={prescription.id}>
-                      <CardContent className="p-4">
-                        <div className="flex justify-between items-start mb-3">
-                          <div>
-                            <h4 className="font-semibold">{prescription.doctor}</h4>
-                            <p className="text-sm text-gray-600">{prescription.date}</p>
-                          </div>
-                          <Badge className={getStatusColor(prescription.status)}>{prescription.status}</Badge>
-                        </div>
-                        <div className="space-y-2">
-                          {prescription.medications.map((med, index) => (
-                            <div key={index} className="bg-gray-50 p-3 rounded">
-                              <div className="font-medium">{med.name}</div>
-                              <div className="text-sm text-gray-600">
-                                Liều dùng: {med.dosage} • Thời gian: {med.duration}
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          )}
-
           {activeTab === "history" && (
-            <Card>
-              <CardHeader>
-                <CardTitle>Lịch sử khám bệnh</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  {medicalHistory.map((record) => (
-                    <Card key={record.id}>
-                      <CardContent className="p-4">
-                        <div className="flex justify-between items-start">
-                          <div className="space-y-2 flex-1">
-                            <div className="flex items-center gap-2">
-                              <h4 className="font-semibold">{record.doctor}</h4>
-                              <span className="text-sm text-gray-600">{record.date}</span>
-                            </div>
-                            <div>
-                              <span className="font-medium">Chẩn đoán: </span>
-                              <span>{record.diagnosis}</span>
-                            </div>
-                            <div>
-                              <span className="font-medium">Điều trị: </span>
-                              <span>{record.treatment}</span>
-                            </div>
-                            {record.notes && (
-                              <div>
-                                <span className="font-medium">Ghi chú: </span>
-                                <span className="text-gray-600">{record.notes}</span>
-                              </div>
-                            )}
-                          </div>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => {
-                              setSelectedRecord(record)
-                              setIsRecordOpen(true)
-                            }}
-                          >
-                            <Eye className="h-4 w-4 mr-1" />
-                            Xem chi tiết
-                          </Button>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
+            <MedicalHistoryList
+              records={medicalHistory}
+              onViewDetail={(record) => {
+                setSelectedRecord(record)
+                setIsRecordOpen(true)
+              }}
+              onPrint={(record) => {
+                toast({
+                  title: "In hồ sơ",
+                  description: `Đang chuẩn bị in hồ sơ khám bệnh`,
+                })
+                window.print()
+              }}
+              showActions={true}
+            />
           )}
 
           {activeTab === "billing" && (
@@ -1217,7 +1178,18 @@ export default function PatientDashboard() {
                               <span>Hạn thanh toán: {bill.dueDate}</span>
                             </div>
                             <div className="text-lg font-bold text-blue-600">{formatCurrency(bill.amount)}</div>
-                            <Badge className={getStatusColor(bill.status)}>{bill.status}</Badge>
+                            <div className="flex items-center gap-2">
+                              <Badge className={getStatusColor(bill.status)}>{bill.status}</Badge>
+                              {bill.paymentMethod && (
+                                <Badge variant="outline" className="text-xs">
+                                  {bill.paymentMethod === 'CASH' ? '💵 Tiền mặt' : 
+                                   bill.paymentMethod === 'TRANSFER' ? '🏦 Chuyển khoản' :
+                                   bill.paymentMethod === 'MOMO' ? '📱 MoMo' :
+                                   bill.paymentMethod === 'VNPAY' ? '💳 VNPay' :
+                                   bill.paymentMethod}
+                                </Badge>
+                              )}
+                            </div>
                           </div>
                           <div className="flex gap-2">
                             <Button variant="outline" size="sm">
@@ -1241,39 +1213,18 @@ export default function PatientDashboard() {
           )}
 
           {/* Medical Record Detail Modal */}
-          <Dialog open={isRecordOpen} onOpenChange={setIsRecordOpen}>
-            <DialogContent className="sm:max-w-lg">
-              <DialogHeader>
-                <DialogTitle>Chi tiết hồ sơ khám bệnh</DialogTitle>
-              </DialogHeader>
-              {selectedRecord && (
-                <div className="space-y-4">
-                  <div>
-                    <Label className="font-semibold">Bác sĩ khám:</Label>
-                    <p>{selectedRecord.doctor}</p>
-                  </div>
-                  <div>
-                    <Label className="font-semibold">Ngày khám:</Label>
-                    <p>{selectedRecord.date}</p>
-                  </div>
-                  <div>
-                    <Label className="font-semibold">Chẩn đoán:</Label>
-                    <p>{selectedRecord.diagnosis}</p>
-                  </div>
-                  <div>
-                    <Label className="font-semibold">Phương pháp điều trị:</Label>
-                    <p>{selectedRecord.treatment}</p>
-                  </div>
-                  {selectedRecord.notes && (
-                    <div>
-                      <Label className="font-semibold">Ghi chú:</Label>
-                      <p className="text-gray-600">{selectedRecord.notes}</p>
-                    </div>
-                  )}
-                </div>
-              )}
-            </DialogContent>
-          </Dialog>
+          <MedicalRecordDetailDialog
+            open={isRecordOpen}
+            onOpenChange={setIsRecordOpen}
+            record={selectedRecord}
+            patientProfile={patientProfile}
+            onPrint={(record) => {
+              toast({
+                title: "In hồ sơ",
+                description: `Đang chuẩn bị in hồ sơ khám bệnh`,
+              })
+            }}
+          />
         </div>
       </div>
 
@@ -1414,7 +1365,7 @@ function BookingForm({ onSubmit }: { onSubmit: (data: any) => void }) {
       })
     : doctors
 
-  const validateForm = () => {
+  const validateForm = async () => {
     const newErrors: {[key: string]: string} = {}
     
     if (!formData.doctor_id) newErrors.doctor_id = "Vui lòng chọn bác sĩ"
@@ -1439,6 +1390,24 @@ function BookingForm({ onSubmit }: { onSubmit: (data: any) => void }) {
       newErrors.appointment_date = "Không thể đặt lịch hẹn vào cuối tuần"
     }
 
+    // Check slot availability if all required fields are filled
+    if (formData.doctor_id && formData.appointment_date && formData.appointment_time && Object.keys(newErrors).length === 0) {
+      try {
+        const availability = await apiClient.checkAppointmentAvailability(
+          Number(formData.doctor_id),
+          formData.appointment_date,
+          formData.appointment_time
+        )
+        
+        if (!availability.available) {
+          newErrors.appointment_time = "Khung giờ này đã có người đặt. Vui lòng chọn khung giờ khác."
+        }
+      } catch (error) {
+        console.error("Error checking availability:", error)
+        // Don't block booking if availability check fails
+      }
+    }
+
     setErrors(newErrors)
     return Object.keys(newErrors).length === 0
   }
@@ -1446,9 +1415,14 @@ function BookingForm({ onSubmit }: { onSubmit: (data: any) => void }) {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     
-    if (!validateForm()) return
-
     setLoading(true)
+    const isValid = await validateForm()
+    
+    if (!isValid) {
+      setLoading(false)
+      return
+    }
+
     try {
       await onSubmit(formData)
       setFormData({

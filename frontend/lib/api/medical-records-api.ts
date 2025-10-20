@@ -53,8 +53,20 @@ class MedicalRecordsApi {
    * Get all medical records
    */
   async getAllMedicalRecords(params?: GetMedicalRecordsParams) {
-    const response = await apiClient.get<{ success: boolean; data: MedicalRecord[]; total: number }>(
-      '/medical-records'
+    const queryParams = new URLSearchParams();
+    if (params) {
+      if (params.patient_id) queryParams.append('patient_id', params.patient_id.toString());
+      if (params.doctor_id) queryParams.append('doctor_id', params.doctor_id.toString());
+      if (params.limit) queryParams.append('limit', params.limit.toString());
+      if (params.offset) queryParams.append('offset', params.offset.toString());
+    }
+    
+    const queryString = queryParams.toString();
+    const endpoint = queryString ? `/medical-records?${queryString}` : '/medical-records';
+    
+    // Use getRaw to get full response, then return the data property
+    const response = await apiClient.getRaw<{ success: boolean; data: MedicalRecord[]; total: number }>(
+      endpoint
     );
     return response.data;
   }
@@ -63,7 +75,7 @@ class MedicalRecordsApi {
    * Get medical record by ID
    */
   async getMedicalRecordById(id: number) {
-    const response = await apiClient.get<{ success: boolean; data: MedicalRecord }>(
+    const response = await apiClient.getRaw<{ success: boolean; data: MedicalRecord }>(
       `/medical-records/${id}`
     );
     return response.data;
@@ -73,7 +85,7 @@ class MedicalRecordsApi {
    * Get medical records by patient ID
    */
   async getMedicalRecordsByPatient(patientId: number) {
-    const response = await apiClient.get<{ success: boolean; data: MedicalRecord[]; total: number }>(
+    const response = await apiClient.getRaw<{ success: boolean; data: MedicalRecord[]; total: number }>(
       `/medical-records/patient/${patientId}`
     );
     return response.data;
