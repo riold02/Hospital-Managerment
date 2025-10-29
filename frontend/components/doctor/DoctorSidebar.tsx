@@ -39,6 +39,7 @@ interface DoctorSidebarProps {
   } | null
   userEmail: string | null
   onLogout: () => void
+  hideResults?: boolean
 }
 
 export default function DoctorSidebar({
@@ -48,6 +49,7 @@ export default function DoctorSidebar({
   doctorInfo,
   userEmail,
   onLogout,
+  hideResults,
 }: DoctorSidebarProps) {
   const menuItems: MenuItem[] = [
     {
@@ -80,12 +82,7 @@ export default function DoctorSidebar({
       icon: FileText,
       badge: null,
     },
-    {
-      value: "results",
-      label: "Kết quả xét nghiệm",
-      icon: FlaskConical,
-      badge: null,
-    },
+    // results tab will be conditionally added below
     {
       value: "doctors",
       label: "Bác sĩ",
@@ -112,6 +109,15 @@ export default function DoctorSidebar({
     //   badge: kpiData.newMessages,
     // },
   ]
+
+  if (!hideResults) {
+    menuItems.splice(5, 0, {
+      value: "results",
+      label: "Kết quả xét nghiệm",
+      icon: FlaskConical,
+      badge: null,
+    })
+  }
 
   const displayName = doctorInfo 
     ? `${doctorInfo.first_name} ${doctorInfo.last_name}`

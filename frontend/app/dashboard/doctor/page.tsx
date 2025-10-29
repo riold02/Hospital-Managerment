@@ -125,6 +125,9 @@ export default function DoctorDashboard() {
   const [currentDateFormatted, setCurrentDateFormatted] = useState<string>('')
   const [mounted, setMounted] = useState(false)
 
+  // Feature flags
+  const showLabResults = false
+
   // Dialog States
   const [showPatientDetail, setShowPatientDetail] = useState(false)
   const [showMedicalHistory, setShowMedicalHistory] = useState(false)
@@ -702,6 +705,7 @@ ${orders.length > 0 ? orders.map((order, index) =>
         doctorInfo={doctorInfo}
         userEmail={user?.email || null}
         onLogout={handleLogout}
+        hideResults={!showLabResults}
       />
 
       {/* Main Content */}
@@ -780,17 +784,21 @@ ${orders.length > 0 ? orders.map((order, index) =>
                 />
               </TabsContent>
 
-              {/* Results Tab */}
-              <TabsContent value="results">
-                <ResultsTab
-                  pendingResults={pendingResults}
-                  loadDashboardData={loadDashboardData}
-                  handlePrintLabResult={handlePrintLabResult}
-                  setSelectedLabResult={setSelectedLabResult}
-                  setShowLabResultDialog={setShowLabResultDialog}
-                  isValueInRange={isValueInRange}
-                />
-              </TabsContent>
+              {showLabResults && (
+                <>
+                  {/* Results Tab */}
+                  <TabsContent value="results">
+                    <ResultsTab
+                      pendingResults={pendingResults}
+                      loadDashboardData={loadDashboardData}
+                      handlePrintLabResult={handlePrintLabResult}
+                      setSelectedLabResult={setSelectedLabResult}
+                      setShowLabResultDialog={setShowLabResultDialog}
+                      isValueInRange={isValueInRange}
+                    />
+                  </TabsContent>
+                </>
+              )}
 
               {/* Patients Tab */}
               <TabsContent value="patients">

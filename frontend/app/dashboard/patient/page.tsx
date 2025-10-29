@@ -124,7 +124,7 @@ export default function PatientDashboard() {
   })
   
   // Appointment filters
-  const [daysFilter, setDaysFilter] = useState<number>(7) // 7 or 30 days
+  const [daysFilter, setDaysFilter] = useState<number>(7) // >0: tương lai, <0: quá khứ, 0: tất cả
   const [statusFilter, setStatusFilter] = useState<string>('all') // all, scheduled, confirmed, cancelled, completed
   
   const { toast } = useToast()
@@ -133,28 +133,40 @@ export default function PatientDashboard() {
   // Parse medications from string format
   // Filter appointments based on days and status
   const filterAppointments = (appointments: Appointment[]) => {
-    const now = new Date()
-    const maxDate = new Date()
-    maxDate.setDate(maxDate.getDate() + daysFilter)
-    
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+
     return appointments.filter(apt => {
-      // Filter by date range (only future appointments within selected days)
-      const aptDate = new Date(apt.appointment_date || apt.date)
-      const isWithinRange = aptDate >= now && aptDate <= maxDate
-      
+      const aptDate = new Date(apt.appointment_date || apt.date || '')
+
+      // Date range logic:
+      // >0: trong N ngày tới (tương lai)
+      // <0: trong N ngày trước (quá khứ)
+      // 0: tất cả
+      let inRange = true
+      if (daysFilter > 0) {
+        const maxDate = new Date(today)
+        maxDate.setDate(maxDate.getDate() + daysFilter)
+        inRange = aptDate >= today && aptDate <= maxDate
+      } else if (daysFilter < 0) {
+        const minDate = new Date(today)
+        minDate.setDate(minDate.getDate() + daysFilter) // daysFilter là số âm
+        inRange = aptDate < today && aptDate >= minDate
+      }
+
       // Filter by status
       let matchesStatus = true
       if (statusFilter !== 'all') {
         const statusMap: any = {
           'scheduled': 'Đã lên lịch',
-          'confirmed': 'Đã xác nhận', 
+          'confirmed': 'Đã xác nhận',
           'cancelled': 'Đã hủy',
           'completed': 'Hoàn thành'
         }
         matchesStatus = apt.status === statusMap[statusFilter]
       }
-      
-      return isWithinRange && matchesStatus
+
+      return inRange && matchesStatus
     })
   }
 
@@ -1026,8 +1038,11 @@ export default function PatientDashboard() {
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
+                        <SelectItem value="-7">7 ngày trước</SelectItem>
+                        <SelectItem value="-30">30 ngày trước</SelectItem>
                         <SelectItem value="7">7 ngày tới</SelectItem>
                         <SelectItem value="30">30 ngày tới</SelectItem>
+                        <SelectItem value="0">Tất cả</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
