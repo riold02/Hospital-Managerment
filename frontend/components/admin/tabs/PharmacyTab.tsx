@@ -6,6 +6,8 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Pill, TrendingUp, AlertTriangle, Package, DollarSign, Eye, Calendar, User, Stethoscope } from "lucide-react"
+import { pharmacyApi } from "@/lib/api"
+import { toast } from "@/hooks/use-toast"
 // Helper function to map status from English to Vietnamese - y chang dược sĩ
 const getStatusInVietnamese = (status: string): string => {
   const statusMap: Record<string, string> = {

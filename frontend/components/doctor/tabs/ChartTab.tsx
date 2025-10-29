@@ -18,6 +18,13 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover"
 import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+} from "@/components/ui/card"
+import {
   Command,
   CommandEmpty,
   CommandGroup,
