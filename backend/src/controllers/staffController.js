@@ -21,7 +21,7 @@ class StaffController {
         });
       }
 
-      const { email, password, first_name, last_name, position, department_id, phone, hire_date } = req.body;
+      const { email, password, first_name, last_name, role, position, department_id, phone, hire_date } = req.body;
 
       // Check if email already exists
       if (email) {
@@ -37,15 +37,34 @@ class StaffController {
         hashedPassword = await bcrypt.hash(password, 10);
       }
 
-      // Map position to role name
+      // Map validation role names (capitalized) to database role names (lowercase)
       const roleMap = {
-        'nurse': 'nurse',
-        'pharmacist': 'pharmacist',
-        'technician': 'technician',
-        'lab_assistant': 'lab_assistant',
-        'cleaner': 'worker'        // Nhân viên vệ sinh -> worker
+        'Nurse': 'nurse',
+        'Pharmacist': 'pharmacist',
+        'Technician': 'technician',
+        'Lab Assistant': 'lab_assistant', // Database uses 'lab_assistant' with underscore
+        'Worker': 'worker',
+        'Driver': 'driver',
+        'Admin': 'admin'
       };
-      const roleName = roleMap[position] || 'worker';
+      
+      // Use role from body if provided, otherwise map from position
+      let roleName = null;
+      if (role) {
+        roleName = roleMap[role] || role.toLowerCase();
+      } else if (position) {
+        // Fallback: Map position to role name (for backward compatibility)
+        const positionRoleMap = {
+          'nurse': 'nurse',
+          'pharmacist': 'pharmacist',
+          'technician': 'technician',
+          'lab_assistant': 'lab_assistant',
+          'cleaner': 'worker'
+        };
+        roleName = positionRoleMap[position] || 'worker';
+      } else {
+        roleName = 'worker'; // Default
+      }
 
       // Create user account first if email and password provided
       let userId = null;

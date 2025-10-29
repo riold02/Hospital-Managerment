@@ -6,7 +6,7 @@ API Server cho hệ thống quản lý bệnh viện
 
 ```bash
 # Clone và vào thư mục
-git clone <repo-url>
+git clone https://github.com/riold02?tab=repositories
 cd backend
 
 # Cấu hình env

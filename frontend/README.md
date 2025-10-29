@@ -29,6 +29,10 @@ docker-compose -f docker-compose.dev.yml up -d
 - Development: http://localhost:3000
 - Production: http://localhost:3000
 
+## Repository
+
+- GitHub: https://github.com/riold02?tab=repositories
+
 ## Demo Accounts (from 003_seed_data.sql)
 
 All demo accounts use password: `Demo1234`
