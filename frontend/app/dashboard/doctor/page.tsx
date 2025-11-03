@@ -1,4 +1,4 @@
-"use client"
+  "use client"
 import { useState, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -105,9 +105,9 @@ export default function DoctorDashboard() {
   const [dashboardData, setDashboardData] = useState<DoctorDashboardData | null>(null)
   const [allAppointments, setAllAppointments] = useState<AppointmentData[]>([])
   const [appointments, setAppointments] = useState<AppointmentData[]>([])
-  const [inpatients, setInpatients] = useState([])
-  const [pendingResults, setPendingResults] = useState([])
-  const [messages, setMessages] = useState([])
+  const [inpatients, setInpatients] = useState<any[]>([])
+  const [pendingResults, setPendingResults] = useState<any[]>([])
+  const [messages, setMessages] = useState<any[]>([])
   const [criticalAlerts, setCriticalAlerts] = useState(0)
   
   // Appointment Filter States
@@ -148,7 +148,7 @@ export default function DoctorDashboard() {
     plan: "",
     template: "",
   })
-  const [orders, setOrders] = useState([])
+  const [orders, setOrders] = useState<any[]>([])
   const [newOrder, setNewOrder] = useState({
     type: "",
     test: "",
@@ -609,25 +609,52 @@ ${clinicalNotes.assessment}
 ${clinicalNotes.plan}
 
 [CHỈ ĐỊNH CẬN LÂM SÀNG]
-${orders.length > 0 ? orders.map((order, index) => 
+${orders && orders.length > 0 ? orders.map((order: any, index: number) => 
   `${index + 1}. ${order.test} (${order.type === 'lab' ? 'Xét nghiệm' : order.type === 'imaging' ? 'Chẩn đoán hình ảnh' : order.type === 'procedure' ? 'Thủ thuật' : 'Hội chẩn'}) - ${order.priority === 'routine' ? 'Thường quy' : order.priority === 'urgent' ? 'Khẩn cấp' : 'Cấp cứu'}`
 ).join('\n') : 'Không có chỉ định'}
 `.trim();
 
       // Build prescription text if any
-      const prescriptionText = prescriptions.length > 0 
-        ? prescriptions.map((rx, index) => 
+      const prescriptionText = prescriptions && prescriptions.length > 0 
+        ? prescriptions.map((rx: any, index: number) => 
             `${index + 1}. ${rx.medicine_name} - ${rx.dosage} x ${rx.quantity} - ${rx.frequency} - ${rx.duration}${rx.instructions ? ' (' + rx.instructions + ')' : ''}`
           ).join('\n')
         : undefined;
 
       // Save medical record
-      await doctorApi.createMedicalRecord({
+      const medicalRecord = await doctorApi.createMedicalRecord({
         patient_id: patientId,
         diagnosis: diagnosisText,
         treatment: treatmentText,
         prescription: prescriptionText,
       });
+
+      // Create prescription with items if any medicines were prescribed
+      if (prescriptions && prescriptions.length > 0) {
+        try {
+          await doctorApi.createPrescription({
+            patient_id: patientId,
+            diagnosis: clinicalNotes.assessment,
+            instructions: clinicalNotes.plan || undefined,
+            items: prescriptions.map((rx: any) => ({
+              medicine_id: Number(rx.medicine_id),
+              quantity: Number(rx.quantity) || 1,
+              dosage: rx.dosage || '',
+              frequency: rx.frequency || '',
+              duration: rx.duration || '',
+              instructions: rx.instructions || undefined
+            }))
+          });
+        } catch (prescriptionError: any) {
+          console.error('Error creating prescription:', prescriptionError);
+          // Don't fail the whole process if prescription creation fails
+          toast({
+            title: "Cảnh báo",
+            description: "Đã lưu hồ sơ nhưng không thể tạo đơn thuốc điện tử",
+            variant: "destructive",
+          });
+        }
+      }
 
       const patientName = selectedPatient.patient_name || 
                          `${selectedPatient.patient_info?.first_name || ''} ${selectedPatient.patient_info?.last_name || ''}`.trim();

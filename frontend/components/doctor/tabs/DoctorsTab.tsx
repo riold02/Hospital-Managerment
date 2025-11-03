@@ -65,10 +65,10 @@ export default function DoctorsTab({ allDoctors }: DoctorsTabProps) {
                   </div>
                   <div>
                     <h4 className="font-semibold text-lg">
-                      Bác sĩ {doctor.first_name} {doctor.last_name}
+                      BS. {doctor.first_name} {doctor.last_name}
                     </h4>
-                    <p className="text-sm text-muted-foreground">
-                      Chuyên khoa: {doctor.specialty}
+                    <p className="text-sm text-gray-600">
+                      {doctor.specialty || 'Chưa xác định chuyên khoa'}
                     </p>
                     {doctor.department && (
                       <p className="text-xs text-gray-500">
@@ -77,13 +77,10 @@ export default function DoctorsTab({ allDoctors }: DoctorsTabProps) {
                     )}
                   </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  <Badge variant="secondary" className="bg-green-100 text-green-800">
-                    Hoạt động
-                  </Badge>
+                <div className="flex flex-col items-end gap-2">
                   <Button size="sm" variant="outline">
                     <Eye className="h-3 w-3 mr-1" />
-                    Xem hồ sơ
+                    Xem chi tiết
                   </Button>
                 </div>
               </div>

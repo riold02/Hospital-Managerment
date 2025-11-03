@@ -421,6 +421,26 @@ router.put('/room-assignments/:id', authenticateToken, requireStaff, validateRoo
 
 /**
  * @swagger
+ * /api/v1/room-assignments/{id}/end:
+ *   patch:
+ *     summary: End room assignment (discharge patient)
+ *     tags: [Room Management]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       200:
+ *         description: Room assignment ended successfully
+ */
+router.patch('/room-assignments/:id/end', authenticateToken, requireStaff, roomAssignmentController.endRoomAssignment);
+
+/**
+ * @swagger
  * /api/v1/room-assignments/{id}:
  *   delete:
  *     summary: Delete room assignment

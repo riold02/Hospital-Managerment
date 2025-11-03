@@ -3,7 +3,7 @@
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { UserCog, Eye } from "lucide-react"
+import { UserCog } from "lucide-react"
 
 interface Department {
   department_name: string
@@ -30,6 +30,23 @@ interface StaffTabProps {
 }
 
 export default function StaffTab({ staffList, staffStats }: StaffTabProps) {
+  // Mapping role names to Vietnamese
+  const getRoleNameInVietnamese = (role: string): string => {
+    const roleMap: Record<string, string> = {
+      'doctor': 'Bác sĩ',
+      'nurse': 'Y tá',
+      'pharmacist': 'Dược sĩ',
+      'lab_technician': 'Kỹ thuật viên',
+      'receptionist': 'Lễ tân',
+      'admin': 'Quản trị viên',
+      'staff': 'Nhân viên',
+      'technician': 'Kỹ thuật viên',
+      'assistant': 'Trợ lý',
+      'manager': 'Quản lý'
+    }
+    return roleMap[role.toLowerCase()] || role
+  }
+
   return (
     <Card>
       <CardHeader>
@@ -49,7 +66,7 @@ export default function StaffTab({ staffList, staffStats }: StaffTabProps) {
                   <div className="text-center">
                     <UserCog className="h-8 w-8 mx-auto mb-2 text-purple-600" />
                     <p className="text-lg font-bold text-purple-600">{count as number}</p>
-                    <p className="text-sm text-gray-600">{role}</p>
+                    <p className="text-sm text-gray-600">{getRoleNameInVietnamese(role)}</p>
                   </div>
                 </Card>
               ))}
@@ -68,13 +85,13 @@ export default function StaffTab({ staffList, staffStats }: StaffTabProps) {
                     <h4 className="font-semibold text-lg">
                       {staff.first_name} {staff.last_name}
                     </h4>
-                    <p className="text-sm text-muted-foreground">
-                      Vị trí: {staff.position || 'Chưa xác định'}
+                    <p className="text-sm text-gray-600">
+                      {staff.position ? getRoleNameInVietnamese(staff.position) : 'Chưa xác định vị trí'}
                     </p>
                     {staff.department && (
                       <p className="text-xs text-gray-500">
                         Khoa: {staff.department.department_name}
-                      </p>
+                      </p>cc
                     )}
                     {staff.contact_number && (
                       <p className="text-xs text-gray-500">
@@ -82,15 +99,6 @@ export default function StaffTab({ staffList, staffStats }: StaffTabProps) {
                       </p>
                     )}
                   </div>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Badge variant="secondary" className={staff.is_active ? "bg-green-100 text-green-800" : "bg-gray-100 text-gray-800"}>
-                    {staff.is_active ? 'Hoạt động' : 'Không hoạt động'}
-                  </Badge>
-                  <Button size="sm" variant="outline">
-                    <Eye className="h-3 w-3 mr-1" />
-                    Xem chi tiết
-                  </Button>
                 </div>
               </div>
             </div>

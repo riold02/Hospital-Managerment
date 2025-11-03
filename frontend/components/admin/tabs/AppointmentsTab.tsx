@@ -135,7 +135,15 @@ export function AppointmentsTab() {
                       <TableCell>
                         {apt.appointment_date ? new Date(apt.appointment_date).toLocaleDateString('vi-VN') : 'N/A'}
                       </TableCell>
-                      <TableCell>{apt.appointment_time || 'N/A'}</TableCell>
+                      <TableCell>
+                        {apt.appointment_time 
+                          ? new Date(apt.appointment_time).toLocaleTimeString('vi-VN', { 
+                              hour: '2-digit', 
+                              minute: '2-digit',
+                              hour12: false 
+                            })
+                          : 'N/A'}
+                      </TableCell>
                       <TableCell>
                         <Badge variant={statusInfo.variant}>{statusInfo.label}</Badge>
                       </TableCell>

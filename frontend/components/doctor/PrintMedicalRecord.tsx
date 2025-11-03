@@ -445,7 +445,7 @@ const PrintMedicalRecord = ({
           </div>
 
           {/* Orders */}
-          {orders.length > 0 && (
+          {orders && orders.length > 0 && (
             <div className="section">
               <div className="section-title">III. CHỈ ĐỊNH CẬN LÂM SÀNG</div>
               <ol className="orders-list">
@@ -467,7 +467,7 @@ const PrintMedicalRecord = ({
           )}
 
           {/* Prescriptions */}
-          {prescriptions.length > 0 ? (
+          {prescriptions && prescriptions.length > 0 ? (
             <div className="section">
               <div className="section-title">IV. ĐƠN THUỐC</div>
               <table className="prescription-table">

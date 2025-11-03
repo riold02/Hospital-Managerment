@@ -118,7 +118,7 @@ export default function MedicalHistoryDialog({
                 <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600 mx-auto mb-4"></div>
                 <p className="text-gray-600">Đang tải lịch sử khám bệnh...</p>
               </div>
-            ) : medicalRecords.length > 0 ? (
+            ) : medicalRecords && medicalRecords.length > 0 ? (
               medicalRecords.map((record) => {
                 const diagnosis = parseSection(record.diagnosis, "CHẨN ĐOÁN")
                 const subjective = parseSection(record.diagnosis, "TRIỆU CHỨNG CHỦ QUAN")

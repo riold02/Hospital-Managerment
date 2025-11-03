@@ -41,6 +41,7 @@ import EnhancedBillingForm from "@/components/nurse/EnhancedBillingForm"
 import RoomManagementTab from "@/components/nurse/RoomManagementTab"
 import PatientListTab from "@/components/nurse/PatientListTab"
 import ShiftScheduleTab from "@/components/nurse/ShiftScheduleTab"
+import AssignmentsTab from "@/components/nurse/AssignmentsTab"
 
 // Helper function to format time
 // Use formatAppointmentTime from utils for consistent time handling
@@ -483,11 +484,11 @@ export default function NurseDashboard() {
           {[
             { value: "overview", label: "Tổng quan", icon: Home },
             { value: "patients", label: "Bệnh nhân phụ trách", icon: Users },
+            { value: "assignments", label: "Phân công bệnh nhân", icon: ClipboardList },
             { value: "appointments", label: "Lịch hẹn", icon: Calendar },
             { value: "shifts", label: "Lịch ca trực", icon: Clock },
             { value: "rooms", label: "Phòng trực", icon: Bed },
             { value: "vital-signs", label: "Sinh hiệu", icon: Activity },
-            { value: "medication", label: "Thuốc", icon: Pill },
             { value: "billing", label: "Thanh toán", icon: DollarSign },
             { value: "care-plan", label: "Kế hoạch chăm sóc", icon: FileText },
           ].map((tab) => {
@@ -567,7 +568,6 @@ export default function NurseDashboard() {
                 {activeTab === "assignments" && "Phân công bệnh nhân"}
                 {activeTab === "rooms" && "Quản lý phòng trực"}
                 {activeTab === "vital-signs" && "Sinh hiệu"}
-                {activeTab === "medication" && "Thuốc"}
                 {activeTab === "billing" && "Quản lý thanh toán"}
                 {activeTab === "care-plan" && "Kế hoạch chăm sóc"}
               </h2>
@@ -946,27 +946,12 @@ export default function NurseDashboard() {
               </Card>
             </TabsContent>
 
-            {/* Other tabs can be added here */}
-            <TabsContent value="assignments">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Phân công bệnh nhân</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-gray-600">Chức năng phân công bệnh nhân đang được phát triển...</p>
-                </CardContent>
-              </Card>
-            </TabsContent>
-
-            <TabsContent value="medication">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Lịch trình thuốc</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-gray-600">Chức năng lịch trình thuốc đang được phát triển...</p>
-                </CardContent>
-              </Card>
+            {/* Assignments Tab */}
+            <TabsContent value="assignments" className="space-y-6">
+              <AssignmentsTab 
+                assignments={patientAssignments}
+                onRefresh={loadDashboardData}
+              />
             </TabsContent>
 
             <TabsContent value="care-plan">

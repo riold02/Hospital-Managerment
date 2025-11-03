@@ -244,8 +244,15 @@ export function DoctorsTab() {
                 {filteredDoctors.map((doctor) => (
                   <TableRow key={doctor.doctor_id}>
                     <TableCell className="font-medium">#{doctor.doctor_id}</TableCell>
-                    <TableCell className="font-medium">
-                      {doctor.first_name} {doctor.last_name}
+                    <TableCell>
+                      <div className="flex flex-col gap-1">
+                        <span className="font-semibold text-base">
+                          BS. {doctor.first_name} {doctor.last_name}
+                        </span>
+                        <span className="text-sm text-muted-foreground">
+                          Vị trí: <span className="font-medium">doctor</span>
+                        </span>
+                      </div>
                     </TableCell>
                     <TableCell>
                       <Badge variant="outline">{doctor.specialty || 'Chưa xác định'}</Badge>
@@ -253,7 +260,9 @@ export function DoctorsTab() {
                     <TableCell>{doctor.phone || 'N/A'}</TableCell>
                     <TableCell>{doctor.email || 'N/A'}</TableCell>
                     <TableCell>
-                      <Badge variant="default">Đang hoạt động</Badge>
+                      <Badge className="bg-green-100 text-green-800 border-green-200">
+                        DOCTOR
+                      </Badge>
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-2">

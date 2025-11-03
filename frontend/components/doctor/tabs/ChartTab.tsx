@@ -439,7 +439,7 @@ const ChartTab = ({
               </div>
 
               {/* Orders List */}
-              {orders.length > 0 && (
+              {orders && orders.length > 0 && (
                 <div className="mt-4">
                   <h4 className="font-semibold mb-2">Danh sách chỉ định:</h4>
                   <div className="space-y-2">
@@ -489,7 +489,7 @@ const ChartTab = ({
             <CardHeader>
               <CardTitle className="flex items-center justify-between">
                 <span>Kê đơn thuốc điện tử</span>
-                {prescriptions.length > 0 && (
+                {prescriptions && prescriptions.length > 0 && (
                   <Badge variant="secondary">{prescriptions.length} thuốc</Badge>
                 )}
               </CardTitle>
@@ -710,7 +710,7 @@ const ChartTab = ({
               )}
 
               {/* Danh sách thuốc đã kê */}
-              {prescriptions.length > 0 && (
+              {prescriptions && prescriptions.length > 0 && (
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
                     <h4 className="font-semibold text-gray-900">
@@ -783,7 +783,7 @@ const ChartTab = ({
               )}
 
               {/* Hiển thị khi chưa có thuốc */}
-              {prescriptions.length === 0 && (
+              {(!prescriptions || prescriptions.length === 0) && (
                 <div className="text-center py-8 text-gray-500">
                   <Pill className="h-12 w-12 mx-auto mb-3 opacity-50" />
                   <p className="font-medium">Chưa có thuốc nào trong đơn</p>
@@ -847,7 +847,7 @@ const ChartTab = ({
                   <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
                   <p className="text-muted-foreground">Đang tải lịch sử khám bệnh...</p>
                 </div>
-              ) : medicalHistory.length > 0 ? (
+              ) : medicalHistory && medicalHistory.length > 0 ? (
                 <div className="space-y-4">
                   {medicalHistory.map((record) => {
                     const diagnosis = parseSection(record.diagnosis, "CHẨN ĐOÁN")

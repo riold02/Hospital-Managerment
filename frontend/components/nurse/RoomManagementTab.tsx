@@ -29,6 +29,36 @@ interface RoomManagementTabProps {
   onRefresh: () => void
 }
 
+// Helper functions - moved outside component to be accessible by child modals
+const getStatusColor = (status: string) => {
+  // API returns lowercase status
+  const statusLower = status.toLowerCase()
+  switch (statusLower) {
+    case 'available':
+      return 'bg-green-100 text-green-800 border-green-200'
+    case 'occupied':
+      return 'bg-blue-100 text-blue-800 border-blue-200'
+    case 'maintenance':
+      return 'bg-yellow-100 text-yellow-800 border-yellow-200'
+    case 'cleaning':
+      return 'bg-purple-100 text-purple-800 border-purple-200'
+    default:
+      return 'bg-gray-100 text-gray-800'
+  }
+}
+
+const getStatusLabel = (status: string) => {
+  // API returns lowercase status
+  const statusLower = status.toLowerCase()
+  switch (statusLower) {
+    case 'available': return 'Trống'
+    case 'occupied': return 'Đang sử dụng'
+    case 'maintenance': return 'Bảo trì'
+    case 'cleaning': return 'Đang dọn'
+    default: return status
+  }
+}
+
 export default function RoomManagementTab({
   rooms,
   roomAssignments,
@@ -56,35 +86,6 @@ export default function RoomManagementTab({
     return (roomAssignments || []).filter(
       assignment => assignment.room_id === roomId && !assignment.end_date
     )
-  }
-
-  const getStatusColor = (status: string) => {
-    // API returns lowercase status
-    const statusLower = status.toLowerCase()
-    switch (statusLower) {
-      case 'available':
-        return 'bg-green-100 text-green-800 border-green-200'
-      case 'occupied':
-        return 'bg-blue-100 text-blue-800 border-blue-200'
-      case 'maintenance':
-        return 'bg-yellow-100 text-yellow-800 border-yellow-200'
-      case 'cleaning':
-        return 'bg-purple-100 text-purple-800 border-purple-200'
-      default:
-        return 'bg-gray-100 text-gray-800'
-    }
-  }
-
-  const getStatusLabel = (status: string) => {
-    // API returns lowercase status
-    const statusLower = status.toLowerCase()
-    switch (statusLower) {
-      case 'available': return 'Trống'
-      case 'occupied': return 'Đang sử dụng'
-      case 'maintenance': return 'Bảo trì'
-      case 'cleaning': return 'Đang dọn'
-      default: return status
-    }
   }
 
   const handleViewRoom = (room: Room) => {

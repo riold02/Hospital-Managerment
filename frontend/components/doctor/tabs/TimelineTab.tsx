@@ -116,7 +116,7 @@ const TimelineTab = ({
                   <Clock className="h-5 w-5 text-green-600" />
                   Lịch hẹn
                   <Badge variant="secondary" className="ml-2">
-                    {appointments.length} lịch hẹn
+                    {appointments?.length || 0} lịch hẹn
                   </Badge>
                 </CardTitle>
               </div>
@@ -158,8 +158,8 @@ const TimelineTab = ({
                 </div>
 
                 <div className="ml-auto text-sm text-muted-foreground">
-                  Hiển thị <span className="font-semibold text-primary">{appointments.length}</span> /{" "}
-                  <span className="font-semibold">{allAppointments.length}</span> lịch hẹn
+                  Hiển thị <span className="font-semibold text-primary">{appointments?.length || 0}</span> /{" "}
+                  <span className="font-semibold">{allAppointments?.length || 0}</span> lịch hẹn
                 </div>
               </div>
             </div>
